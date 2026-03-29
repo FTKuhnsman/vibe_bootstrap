@@ -1,0 +1,40 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "A web application built with Flask and Vue"
+  },
+  "backend": {
+    "language": "python",
+    "framework": "flask",
+    "directory": "backend",
+    "test_command": "cd backend && pytest",
+    "lint_command": "cd backend && ruff check . && ruff format --check .",
+    "format_tool": "ruff format",
+    "format_pattern": "\\.py$",
+    "server_command": "flask run",
+    "server_port": 5000,
+    "package_manager": "pip",
+    "install_command": "pip install -r requirements.txt",
+    "cli_prefixes": ["flask", "pytest", "ruff"]
+  },
+  "frontend": {
+    "language": "typescript",
+    "framework": "vue",
+    "directory": "frontend",
+    "test_command": "cd frontend && npm test",
+    "lint_command": "cd frontend && npm run lint",
+    "build_command": "cd frontend && npm run build",
+    "format_tool": "npx prettier --write",
+    "format_pattern": "\\.(ts|vue|js|json|css)$",
+    "server_command": "npm run dev",
+    "server_port": 5173,
+    "package_manager": "npm",
+    "install_command": "npm install",
+    "cli_prefixes": ["npm", "npx"]
+  },
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

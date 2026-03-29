@@ -1,0 +1,26 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "A web application built with Go and HTMX"
+  },
+  "backend": {
+    "language": "go",
+    "framework": "go-stdlib",
+    "directory": ".",
+    "test_command": "go test ./...",
+    "lint_command": "golangci-lint run",
+    "format_tool": "gofmt -w",
+    "format_pattern": "\\.go$",
+    "server_command": "go run .",
+    "server_port": 8080,
+    "package_manager": "go",
+    "install_command": "go mod download",
+    "cli_prefixes": ["go", "golangci-lint"]
+  },
+  "frontend": null,
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

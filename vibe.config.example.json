@@ -1,0 +1,40 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "What this project does"
+  },
+  "backend": {
+    "language": "python",
+    "framework": "django",
+    "directory": "backend",
+    "test_command": "cd backend && pytest",
+    "lint_command": "cd backend && ruff check . && ruff format --check .",
+    "format_tool": "ruff format",
+    "format_pattern": "\\.py$",
+    "server_command": "python manage.py runserver",
+    "server_port": 8000,
+    "package_manager": "pip",
+    "install_command": "pip install -r requirements.txt",
+    "cli_prefixes": ["python manage.py", "pytest", "ruff"]
+  },
+  "frontend": {
+    "language": "typescript",
+    "framework": "react",
+    "directory": "frontend",
+    "test_command": "cd frontend && pnpm test",
+    "lint_command": "cd frontend && pnpm lint",
+    "build_command": "cd frontend && pnpm build",
+    "format_tool": "npx prettier --write",
+    "format_pattern": "\\.(ts|tsx|js|jsx|json|css)$",
+    "server_command": "pnpm dev",
+    "server_port": 5173,
+    "package_manager": "pnpm",
+    "install_command": "pnpm install",
+    "cli_prefixes": ["pnpm", "npx"]
+  },
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allowedTools": [
+      "Read", "Write", "Edit", "MultiEdit", "Glob", "Grep",
+      {{CLI_PREFIXES_AS_BASH_TOOLS}},
+      "Bash(git add:*)", "Bash(git status:*)", "Bash(git commit:*)",
+      "Bash(git push:*)", "Bash(git diff:*)", "Bash(git branch:*)",
+      "Bash(git checkout:*)", "Bash(git log:*)", "Bash(gh pr:*)",
+      "Bash(curl:*)"{{CD_ENTRIES}}
+    ],
+    "deny": [
+      "Read(./.env)", "Read(./.env.*)", "Write(./.env)", "Write(./.env.*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{FORMAT_HOOK_COMMAND}}"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{BLOCK_HOOK_COMMAND}}"
+          }
+        ]
+      }
+    ]
+  }
+}

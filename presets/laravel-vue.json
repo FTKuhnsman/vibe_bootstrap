@@ -1,0 +1,40 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "A web application built with Laravel and Vue"
+  },
+  "backend": {
+    "language": "php",
+    "framework": "laravel",
+    "directory": "backend",
+    "test_command": "cd backend && php artisan test",
+    "lint_command": "cd backend && ./vendor/bin/pint --test",
+    "format_tool": "./vendor/bin/pint",
+    "format_pattern": "\\.php$",
+    "server_command": "php artisan serve",
+    "server_port": 8000,
+    "package_manager": "composer",
+    "install_command": "composer install",
+    "cli_prefixes": ["php artisan", "composer", "./vendor/bin/pint"]
+  },
+  "frontend": {
+    "language": "typescript",
+    "framework": "vue",
+    "directory": "frontend",
+    "test_command": "cd frontend && npm test",
+    "lint_command": "cd frontend && npm run lint",
+    "build_command": "cd frontend && npm run build",
+    "format_tool": "npx prettier --write",
+    "format_pattern": "\\.(ts|vue|js|json|css)$",
+    "server_command": "npm run dev",
+    "server_port": 5173,
+    "package_manager": "npm",
+    "install_command": "npm install",
+    "cli_prefixes": ["npm", "npx"]
+  },
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

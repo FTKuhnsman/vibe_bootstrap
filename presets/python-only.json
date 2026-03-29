@@ -1,0 +1,26 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "A Python application"
+  },
+  "backend": {
+    "language": "python",
+    "framework": "python",
+    "directory": ".",
+    "test_command": "pytest",
+    "lint_command": "ruff check . && ruff format --check .",
+    "format_tool": "ruff format",
+    "format_pattern": "\\.py$",
+    "server_command": "",
+    "server_port": null,
+    "package_manager": "pip",
+    "install_command": "pip install -r requirements.txt",
+    "cli_prefixes": ["python", "pytest", "ruff"]
+  },
+  "frontend": null,
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

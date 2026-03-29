@@ -1,0 +1,27 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "A Node.js/TypeScript application"
+  },
+  "backend": null,
+  "frontend": {
+    "language": "typescript",
+    "framework": "node",
+    "directory": ".",
+    "test_command": "npx vitest run",
+    "lint_command": "npx eslint .",
+    "build_command": "npx tsc --build",
+    "format_tool": "npx prettier --write",
+    "format_pattern": "\\.(ts|js|json)$",
+    "server_command": "npm run dev",
+    "server_port": 3000,
+    "package_manager": "npm",
+    "install_command": "npm install",
+    "cli_prefixes": ["npm", "npx", "node"]
+  },
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

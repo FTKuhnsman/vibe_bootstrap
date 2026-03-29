@@ -1,0 +1,40 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "A web application built with Express and React"
+  },
+  "backend": {
+    "language": "typescript",
+    "framework": "express",
+    "directory": "backend",
+    "test_command": "cd backend && npm test",
+    "lint_command": "cd backend && npx eslint .",
+    "format_tool": "npx prettier --write",
+    "format_pattern": "\\.(ts|js|json)$",
+    "server_command": "npm run dev",
+    "server_port": 3001,
+    "package_manager": "npm",
+    "install_command": "npm install",
+    "cli_prefixes": ["npm run", "npx", "node"]
+  },
+  "frontend": {
+    "language": "typescript",
+    "framework": "react",
+    "directory": "frontend",
+    "test_command": "cd frontend && pnpm test",
+    "lint_command": "cd frontend && pnpm lint",
+    "build_command": "cd frontend && pnpm build",
+    "format_tool": "npx prettier --write",
+    "format_pattern": "\\.(ts|tsx|js|jsx|json|css)$",
+    "server_command": "pnpm dev",
+    "server_port": 5173,
+    "package_manager": "pnpm",
+    "install_command": "pnpm install",
+    "cli_prefixes": ["pnpm", "npx"]
+  },
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

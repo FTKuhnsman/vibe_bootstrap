@@ -1,0 +1,40 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "A web application built with Ruby on Rails and React"
+  },
+  "backend": {
+    "language": "ruby",
+    "framework": "rails",
+    "directory": "backend",
+    "test_command": "cd backend && bundle exec rspec",
+    "lint_command": "cd backend && bundle exec rubocop",
+    "format_tool": "bundle exec rubocop -A",
+    "format_pattern": "\\.rb$",
+    "server_command": "bundle exec rails server",
+    "server_port": 3000,
+    "package_manager": "bundler",
+    "install_command": "bundle install",
+    "cli_prefixes": ["bundle exec", "rails", "rake"]
+  },
+  "frontend": {
+    "language": "typescript",
+    "framework": "react",
+    "directory": "frontend",
+    "test_command": "cd frontend && pnpm test",
+    "lint_command": "cd frontend && pnpm lint",
+    "build_command": "cd frontend && pnpm build",
+    "format_tool": "npx prettier --write",
+    "format_pattern": "\\.(ts|tsx|js|jsx|json|css)$",
+    "server_command": "pnpm dev",
+    "server_port": 5173,
+    "package_manager": "pnpm",
+    "install_command": "pnpm install",
+    "cli_prefixes": ["pnpm", "npx"]
+  },
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

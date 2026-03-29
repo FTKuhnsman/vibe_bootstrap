@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {{#each configurations}}
+    {
+      "name": "{{this.name}}",
+      "runtimeExecutable": "{{this.runtimeExecutable}}",
+      "runtimeArgs": {{this.runtimeArgs}},
+      "port": {{this.port}},
+      "cwd": "{{this.cwd}}"
+    }
+    {{/each}}
+  ]
+}

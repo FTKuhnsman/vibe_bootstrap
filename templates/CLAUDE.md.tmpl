@@ -1,0 +1,174 @@
+# {{project.name}}
+
+**Purpose**: {{project.description}}
+
+## Stack
+
+| Layer | Tech |
+|-------|------|
+{{#if backend}}| **Backend** | {{backend.language}} ({{backend.framework}}) |
+{{/if}}{{#if frontend}}| **Frontend** | {{frontend.language}} ({{frontend.framework}}) |
+{{/if}}| **Testing** | See Testing & Linting section |
+| **Package Managers** | {{package_managers}} |
+
+## Architecture
+
+See `docs/spec/ARCHITECTURE.md` for detailed system design.
+
+Run `/spec architecture` to generate or update.
+
+## Running Locally
+
+{{#if backend}}
+### Backend
+```bash
+cd {{backend.directory}}
+{{backend.install_command}}
+{{backend.server_command}}
+```
+{{/if}}
+{{#if frontend}}
+### Frontend
+```bash
+cd {{frontend.directory}}
+{{frontend.install_command}}
+{{frontend.server_command}}
+```
+{{/if}}
+
+## Testing & Linting
+
+```bash
+{{#if backend}}
+# Backend tests
+{{backend.test_command}}
+
+# Backend lint
+{{backend.lint_command}}
+{{/if}}
+{{#if frontend}}
+# Frontend tests
+{{frontend.test_command}}
+
+# Frontend lint
+{{frontend.lint_command}}
+
+# Frontend build
+{{frontend.build_command}}
+{{/if}}
+```
+
+## Conventions
+
+See `docs/spec/CONVENTIONS.md` for detailed coding patterns and standards.
+
+Run `/spec conventions` to generate or update.
+
+## Development Workflow
+
+Use slash commands to drive the multi-agent coordinated workflow:
+
+| Command | When to use |
+|---------|-------------|
+| `/implement F-XXX` | New feature end-to-end (plan → TDD → agents → smoke test) |
+| `/fix-bug B-XXX` | Bug fix (reproduce → failing test → fix → verify) |
+| `/refactor [desc]` | Refactoring (analyze → TDD → agents → verify) |
+| `/verify-ui [flow]` | Browser smoke test using Claude Preview tools |
+| `/review` | Pre-PR code review |
+| `/test [component]` | Generate tests for a component |
+| `/spec [file]` | Generate or update spec files |
+| `/status` | Quick project dashboard |
+| `/feature [cmd]` | Manage feature backlog |
+| `/bug [cmd]` | Manage bug tracker |
+| `/task [cmd]` | Manage tasks |
+| `/plan [filter]` | View project status |
+| `/commit-push-pr` | Git workflow automation |
+| `/next-phase` | Execute next development phase |
+| `/clean-up` | Code quality review of diff |
+
+### Workflow Pattern
+
+All implementation follows: **Plan → TDD → Parallel Agents → Verify → Smoke Test → Commit**
+
+1. **Plan**: Read context (FEATURES.md, DECISIONS.md, DEPENDENCIES.md, specs, CLAUDE.md), design approach, get user approval
+2. **TDD**: Write failing tests first that define expected behavior
+3. **Implement**: Dispatch parallel agents (backend + frontend independent), each with file ownership (no overlap)
+4. **Verify**: Run full test suite after each batch, fix regressions immediately
+5. **Smoke Test**: Browser verification via `/verify-ui` — zero console errors required
+6. **Commit**: One commit per logical step using conventional format
+
+### Agent Dispatch Rules
+
+- Each agent gets: files to read (reference), files to modify (ownership), completion criteria, scope guard
+- Backend and frontend agents run in parallel when independent
+- No file ownership overlap between concurrent agents
+- Progress tracked in `docs/plan/PROGRESS_*.md` for session resilience
+
+### Session Resilience
+
+If a session dies mid-implementation:
+- Check `docs/plan/PROGRESS_*.md` for the last completed sub-step
+- Resume from the next incomplete sub-step
+- All committed work is safe
+- Use `/implement --resume` to auto-detect and continue
+
+## Smoke Test Flows
+
+<!-- Define app-specific browser test flows here for /verify-ui to execute.
+Example:
+
+### Auth Flow
+1. Navigate to /login
+2. Verify login form renders
+3. Fill email and password, submit
+4. Verify redirect to dashboard
+
+### Main Feature Flow
+1. Navigate to /dashboard
+2. Click "Create New"
+3. Fill form and submit
+4. Verify item appears in list
+-->
+
+_Run `/spec` to help populate this section based on your app's routes and features._
+
+## Environment Variables
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `SECRET_KEY` | (required) | Application secret |
+| `DEBUG` | `True` | Set `False` in production |
+
+<!-- Add your environment variables here -->
+
+## Verification Checklist
+
+{{#if backend}}- [ ] Backend tests pass: `{{backend.test_command}}`
+- [ ] Backend lint clean: `{{backend.lint_command}}`
+{{/if}}{{#if frontend}}- [ ] Frontend tests pass: `{{frontend.test_command}}`
+- [ ] Frontend build succeeds: `{{frontend.build_command}}`
+- [ ] Frontend lint clean: `{{frontend.lint_command}}`
+{{/if}}- [ ] Dev servers start without errors
+- [ ] Zero console errors in browser
+
+## Spec Files
+
+| File | Purpose | Command |
+|------|---------|---------|
+| `docs/spec/STACK.md` | Languages, frameworks, versions | `/spec stack` |
+| `docs/spec/ARCHITECTURE.md` | System design, data flow | `/spec architecture` |
+| `docs/spec/CONVENTIONS.md` | Code patterns, standards | `/spec conventions` |
+| `docs/spec/API.md` | API contracts, endpoints | `/spec api` |
+
+## Planning System
+
+See `docs/plan/`:
+- **FEATURES.md** — Feature roadmap and acceptance criteria
+- **ACTIVE.md** — Current sprint tracker
+- **BUGS.md** — Known bugs by severity
+- **DECISIONS.md** — Architecture decision records
+- **DEPENDENCIES.md** — Change impact analysis
+
+## Known Issues & Gotchas
+
+<!-- Add project-specific gotchas here -->
