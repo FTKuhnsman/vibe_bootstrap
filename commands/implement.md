@@ -11,16 +11,20 @@ allowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - TodoWrite
-  - mcp__Claude_Preview__preview_start
-  - mcp__Claude_Preview__preview_stop
-  - mcp__Claude_Preview__preview_snapshot
-  - mcp__Claude_Preview__preview_screenshot
-  - mcp__Claude_Preview__preview_console_logs
-  - mcp__Claude_Preview__preview_eval
-  - mcp__Claude_Preview__preview_click
-  - mcp__Claude_Preview__preview_fill
-  - mcp__Claude_Preview__preview_logs
-  - mcp__Claude_Preview__preview_network
+  - mcp__chrome-devtools__new_page
+  - mcp__chrome-devtools__navigate_page
+  - mcp__chrome-devtools__close_page
+  - mcp__chrome-devtools__list_pages
+  - mcp__chrome-devtools__select_page
+  - mcp__chrome-devtools__take_snapshot
+  - mcp__chrome-devtools__take_screenshot
+  - mcp__chrome-devtools__list_console_messages
+  - mcp__chrome-devtools__evaluate_script
+  - mcp__chrome-devtools__click
+  - mcp__chrome-devtools__fill
+  - mcp__chrome-devtools__fill_form
+  - mcp__chrome-devtools__list_network_requests
+  - mcp__chrome-devtools__wait_for
 ---
 
 # Implement
@@ -41,11 +45,12 @@ End-to-end feature implementation using the multi-agent coordinated workflow.
 
 1. **Read context:**
    - `docs/plan/FEATURES.md` — feature spec and acceptance criteria
+   - `docs/plan/discovery/F-XXX-*.md` — design discovery doc (if `/feature discovery` was run; provides background, alternatives, decisions)
    - `docs/plan/DECISIONS.md` — architecture decisions to respect
    - `docs/plan/DEPENDENCIES.md` — change impact matrix
    - `docs/spec/ARCHITECTURE.md` — system design and data flow
    - `docs/spec/CONVENTIONS.md` — code patterns and standards
-   - `CLAUDE.md` — stack, testing commands, conventions
+   - `CLAUDE.md` — stack, testing commands, conventions, agent dispatch specification
    - `docs/plan/ACTIVE.md` — what's in flight (avoid conflicts)
    - Relevant source code for affected areas
 
@@ -103,19 +108,27 @@ For each step that changes application logic:
 
 ### Phase 4: Browser Smoke Test (Coordinator)
 
-1. **Start dev servers** using `preview_start` for servers in `.claude/launch.json`
-2. **Test the feature end-to-end:**
-   - Navigate to the relevant page using `preview_eval`
-   - Use `preview_snapshot` to verify page structure
-   - Use `preview_fill` and `preview_click` to interact with forms/buttons
-   - Use `preview_console_logs` with `level: error` to check for runtime errors
-   - Use `preview_network` to verify API calls
-   - Follow any app-specific flows defined in CLAUDE.md's "Smoke Test Flows" section
-3. **If bugs found:**
+Skip this phase entirely if the change has no UI impact (pure models/migrations/CLI/background tasks with no template or component touched).
+
+1. **Confirm dev servers are running** (chrome-devtools MCP does NOT start servers):
+   - Read `.claude/launch.json` for the configured server commands and ports
+   - Check each port responds; if not, start via `Bash` as a background process and track the PID
+2. **Open Chrome and navigate:**
+   - `new_page(url: <frontend-url>)` — or reuse a page via `list_pages` + `select_page`
+   - `navigate_page` to the relevant route
+3. **Test the feature end-to-end:**
+   - Use `take_snapshot` to verify page structure
+   - Use `fill` / `fill_form` / `click` for form interaction
+   - Use `evaluate_script` for controlled inputs, portal-rendered components, or DOM queries that `click`/`fill` can't handle
+   - Use `list_console_messages` (filter `level === 'error'`) — must be zero
+   - Use `list_network_requests` to verify API calls succeeded
+   - Follow any app-specific flows + gotchas in CLAUDE.md's "Smoke Test Flows" and "Browser Smoke Test Playbook" sections
+4. **If bugs found:**
    - Log with `/bug log`
    - Fix immediately
    - Re-run smoke test
-4. **Update progress file** — mark smoke test complete
+5. **Stop servers** if you started them; leave alone if the user did
+6. **Update progress file** — mark smoke test complete
 
 ### Phase 5: Finalize (Coordinator)
 
@@ -142,16 +155,23 @@ If `$ARGUMENTS` is `--resume`:
 3. Read it and resume from the first incomplete sub-step
 4. All committed work is safe — pick up exactly where it left off
 
-## Agent Dispatch Template
+## Agent Dispatch Specification
 
-When dispatching agents, each prompt must include:
-```
-Files to READ (reference only): [list]
-Files to CREATE or MODIFY: [list]
-Patterns to follow: [reference CLAUDE.md and docs/spec/CONVENTIONS.md]
-Completion criteria: [what "done" looks like]
-What NOT to do: [scope guard]
-```
+Every agent dispatch MUST include these five fields. See CLAUDE.md "Agent Dispatch Specification" for the canonical version and rules.
+
+| Field | Purpose | Example |
+|-------|---------|---------|
+| **Files to read** | Reference context (read-only) | `core/models.py`, `core/tests/test_permissions.py` |
+| **Files to modify** | Ownership — only this agent touches these | `core/permissions.py`, `core/signals.py` |
+| **Work** | Bullet list of specific tasks | "Create `can_view_module()` with organizer bypass..." |
+| **Completion criteria** | How to verify the agent succeeded | "Permission and signal tests pass" |
+| **Scope guard** | What the agent must NOT touch | "Only `core/permissions.py` and `core/signals.py`" |
+
+**Rules:**
+- No file ownership overlap between concurrent agents — if two agents need the same file, run them sequentially
+- Each agent batch is followed by a test suite run before the next batch starts
+- Group agents to maximize parallelism: backend agents alongside frontend agents when independent
+- Maximum 3 concurrent agents per batch to keep context manageable
 
 ## Commit Convention
 

@@ -11,12 +11,15 @@ allowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - TodoWrite
-  - mcp__Claude_Preview__preview_start
-  - mcp__Claude_Preview__preview_stop
-  - mcp__Claude_Preview__preview_snapshot
-  - mcp__Claude_Preview__preview_console_logs
-  - mcp__Claude_Preview__preview_eval
-  - mcp__Claude_Preview__preview_logs
+  - mcp__chrome-devtools__new_page
+  - mcp__chrome-devtools__navigate_page
+  - mcp__chrome-devtools__close_page
+  - mcp__chrome-devtools__list_pages
+  - mcp__chrome-devtools__select_page
+  - mcp__chrome-devtools__take_snapshot
+  - mcp__chrome-devtools__list_console_messages
+  - mcp__chrome-devtools__evaluate_script
+  - mcp__chrome-devtools__list_network_requests
 ---
 
 # Refactor

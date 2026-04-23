@@ -1,0 +1,125 @@
+#Requires -Version 5.1
+# Deploy {{project.name}}: bump semver, build Docker image, push, trigger webhook.
+# Usage: .\deploy.ps1 <dev|prod> <major|minor|patch>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true, Position = 0)]
+    [ValidateSet('dev', 'prod')]
+    [Alias('Env')]
+    [string]$Target,
+
+    [Parameter(Mandatory = $true, Position = 1)]
+    [ValidateSet('major', 'minor', 'patch')]
+    [string]$Bump
+)
+
+$ErrorActionPreference = 'Stop'
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$EnvFile = Join-Path $ScriptDir '.env'
+
+if (Test-Path $EnvFile) {
+    Get-Content $EnvFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -eq '' -or $line.StartsWith('#')) { return }
+        $eq = $line.IndexOf('=')
+        if ($eq -lt 1) { return }
+        $key = $line.Substring(0, $eq).Trim()
+        $value = $line.Substring($eq + 1).Trim()
+        if ($value.Length -ge 2) {
+            $first = $value[0]; $last = $value[$value.Length - 1]
+            if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+        }
+        Set-Item -Path "Env:$key" -Value $value
+    }
+}
+
+$Image = '{{deploy.image}}'
+
+switch ($Target) {
+    'dev' {
+        if (-not $env:PORTAINER_DEV_WEBHOOK_URL) {
+            throw 'Set PORTAINER_DEV_WEBHOOK_URL in .env or environment'
+        }
+        $WebhookUrl = $env:PORTAINER_DEV_WEBHOOK_URL
+        $LatestTag = 'latest-dev'
+    }
+    'prod' {
+        if (-not $env:PORTAINER_WEBHOOK_URL) {
+            throw 'Set PORTAINER_WEBHOOK_URL in .env or environment'
+        }
+        $WebhookUrl = $env:PORTAINER_WEBHOOK_URL
+        $LatestTag = 'latest'
+    }
+}
+
+$Branch = (& git rev-parse --abbrev-ref HEAD).Trim()
+
+# NOTE: do not name this $LatestTag — PowerShell variable lookup is case-insensitive
+# and would clobber the docker rolling tag set above.
+$tagOutput = & git tag -l 'v[0-9]*.[0-9]*.[0-9]*' 'v[0-9]*.[0-9]*.[0-9]*-dev' --sort=-v:refname
+$previousGitTag = ($tagOutput | Select-Object -First 1)
+$current = '0.0.0'
+if ($previousGitTag) {
+    $current = $previousGitTag -replace '^v', '' -replace '-dev$', ''
+}
+
+$parts = $current.Split('.')
+[int]$major = $parts[0]
+[int]$minor = $parts[1]
+[int]$patch = $parts[2]
+
+switch ($Bump) {
+    'major' { $major++; $minor = 0; $patch = 0 }
+    'minor' { $minor++; $patch = 0 }
+    'patch' { $patch++ }
+}
+
+$Version = "$major.$minor.$patch"
+
+$VersionPath = Join-Path $ScriptDir 'VERSION'
+[System.IO.File]::WriteAllText($VersionPath, "$Version`n", (New-Object System.Text.UTF8Encoding $false))
+
+if ($Target -eq 'prod' -and $Branch -eq '{{git.main_branch}}') {
+    & git tag "v$Version"
+    Write-Host "Tagged v$Version"
+} elseif ($Target -eq 'dev') {
+    & git tag "v$Version-dev"
+    Write-Host "Tagged v$Version-dev"
+} else {
+    Write-Host "[$Target] Branch '$Branch' - skipping tag (v$Version)"
+}
+
+Write-Host "[$Target] Building ${Image}:${LatestTag} + v$Version..."
+& docker build `
+    --build-arg "APP_VERSION=$Version" `
+    --build-arg "BUILD_ENV=$Target" `
+    -t "${Image}:${LatestTag}" -t "${Image}:v$Version" $ScriptDir
+if ($LASTEXITCODE -ne 0) { throw "docker build failed (exit $LASTEXITCODE)" }
+
+& docker tag "${Image}:v$Version" "${Image}:${LatestTag}"
+if ($LASTEXITCODE -ne 0) { throw "docker tag failed (exit $LASTEXITCODE)" }
+
+Write-Host "[$Target] Pushing image..."
+& docker push "${Image}:${LatestTag}"
+if ($LASTEXITCODE -ne 0) { throw "docker push failed (exit $LASTEXITCODE)" }
+& docker push "${Image}:v$Version"
+if ($LASTEXITCODE -ne 0) { throw "docker push failed (exit $LASTEXITCODE)" }
+
+Write-Host "[$Target] Triggering redeploy webhook..."
+$mask = if ($WebhookUrl.Length -gt 24) {
+    $WebhookUrl.Substring(0, 24) + '...(' + ($WebhookUrl.Length - 24) + ' more)'
+} else { '(short url)' }
+Write-Host "  POST $mask"
+try {
+    $resp = Invoke-WebRequest -Method Post -Uri $WebhookUrl -UseBasicParsing -ErrorAction Stop
+    Write-Host "  -> HTTP $($resp.StatusCode) $($resp.StatusDescription)"
+} catch {
+    $status = $_.Exception.Response.StatusCode.value__
+    $desc = $_.Exception.Response.StatusDescription
+    throw "Redeploy webhook failed: HTTP $status $desc ($($_.Exception.Message))"
+}
+
+Write-Host "Done! Deployed v$Version to $Target"

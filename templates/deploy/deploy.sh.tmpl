@@ -1,0 +1,75 @@
+#!/bin/bash
+# Deploy {{project.name}}: bump semver, build Docker image, push, trigger webhook.
+# Usage: ./deploy.sh <dev|prod> <major|minor|patch>
+#
+# Requires (via .env or environment):
+#   PORTAINER_WEBHOOK_URL      — prod stack redeploy webhook
+#   PORTAINER_DEV_WEBHOOK_URL  — dev stack redeploy webhook
+set -euo pipefail
+
+if [ -f "$(dirname "$0")/.env" ]; then
+    set -a
+    source "$(dirname "$0")/.env"
+    set +a
+fi
+
+IMAGE="{{deploy.image}}"
+ENV="${1:?Usage: ./deploy.sh <dev|prod> <major|minor|patch>}"
+BUMP="${2:?Usage: ./deploy.sh <dev|prod> <major|minor|patch>}"
+
+case "$ENV" in
+  dev)
+    WEBHOOK_URL="${PORTAINER_DEV_WEBHOOK_URL:?Set PORTAINER_DEV_WEBHOOK_URL in .env or environment}"
+    LATEST_TAG="latest-dev"
+    ;;
+  prod)
+    WEBHOOK_URL="${PORTAINER_WEBHOOK_URL:?Set PORTAINER_WEBHOOK_URL in .env or environment}"
+    LATEST_TAG="latest"
+    ;;
+  *) echo "Error: first argument must be dev or prod"; exit 1 ;;
+esac
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+CURRENT="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' 'v[0-9]*.[0-9]*.[0-9]*-dev' --sort=-v:refname | head -n1 | sed 's/^v//' | sed 's/-dev$//')"
+CURRENT="${CURRENT:-0.0.0}"
+
+IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+case "$BUMP" in
+  major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+  minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+  patch) PATCH=$((PATCH + 1)) ;;
+  *) echo "Error: second argument must be major, minor, or patch"; exit 1 ;;
+esac
+
+VERSION="$MAJOR.$MINOR.$PATCH"
+echo "$VERSION" > "$(dirname "$0")/VERSION"
+
+if [ "$ENV" = "prod" ] && [ "$BRANCH" = "{{git.main_branch}}" ]; then
+  git tag "v$VERSION"
+  echo "Tagged v$VERSION"
+elif [ "$ENV" = "dev" ]; then
+  git tag "v$VERSION-dev"
+  echo "Tagged v$VERSION-dev"
+else
+  echo "[$ENV] Branch '$BRANCH' — skipping tag (v$VERSION)"
+fi
+
+echo "[$ENV] Building $IMAGE:$LATEST_TAG + v$VERSION..."
+docker build \
+  --build-arg "APP_VERSION=$VERSION" \
+  --build-arg "BUILD_ENV=$ENV" \
+  -t "$IMAGE:$LATEST_TAG" -t "$IMAGE:v$VERSION" .
+
+# Force-retag rolling tag in case build cache left it pointing at an older digest.
+docker tag "$IMAGE:v$VERSION" "$IMAGE:$LATEST_TAG"
+
+echo "[$ENV] Pushing image..."
+docker push "$IMAGE:$LATEST_TAG"
+docker push "$IMAGE:v$VERSION"
+
+echo "[$ENV] Triggering redeploy webhook..."
+curl -sS -X POST "$WEBHOOK_URL"
+
+echo "Done! Deployed v$VERSION to $ENV"

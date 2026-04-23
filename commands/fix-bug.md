@@ -9,16 +9,20 @@ allowed-tools:
   - Bash
   - Agent
   - TodoWrite
-  - mcp__Claude_Preview__preview_start
-  - mcp__Claude_Preview__preview_stop
-  - mcp__Claude_Preview__preview_snapshot
-  - mcp__Claude_Preview__preview_screenshot
-  - mcp__Claude_Preview__preview_console_logs
-  - mcp__Claude_Preview__preview_eval
-  - mcp__Claude_Preview__preview_click
-  - mcp__Claude_Preview__preview_fill
-  - mcp__Claude_Preview__preview_logs
-  - mcp__Claude_Preview__preview_network
+  - mcp__chrome-devtools__new_page
+  - mcp__chrome-devtools__navigate_page
+  - mcp__chrome-devtools__close_page
+  - mcp__chrome-devtools__list_pages
+  - mcp__chrome-devtools__select_page
+  - mcp__chrome-devtools__take_snapshot
+  - mcp__chrome-devtools__take_screenshot
+  - mcp__chrome-devtools__list_console_messages
+  - mcp__chrome-devtools__evaluate_script
+  - mcp__chrome-devtools__click
+  - mcp__chrome-devtools__fill
+  - mcp__chrome-devtools__fill_form
+  - mcp__chrome-devtools__list_network_requests
+  - mcp__chrome-devtools__wait_for
 ---
 
 # Fix Bug
@@ -47,9 +51,10 @@ Fix a bug using the structured reproduce → test → fix → verify workflow.
 ### Step 2: Reproduce
 
 1. **Try to reproduce in browser first:**
-   - Start dev servers with `preview_start`
+   - Confirm dev servers from `.claude/launch.json` are running (start them via `Bash` if not — chrome-devtools MCP does NOT start servers)
+   - Open a Chrome page with `new_page` (or reuse one via `list_pages` + `select_page`); navigate to the affected URL via `navigate_page`
    - Follow reproduction steps from bug report
-   - Use `preview_console_logs` and `preview_snapshot` to capture the error
+   - Use `list_console_messages` and `take_snapshot` to capture the error
    - If reproducible, note the exact error and state
 2. **If not browser-reproducible**, reproduce via test:
    - Write a minimal test case that triggers the bug
@@ -80,7 +85,7 @@ Fix a bug using the structured reproduce → test → fix → verify workflow.
    - Navigate to affected area
    - Follow original reproduction steps
    - Verify the bug no longer occurs
-   - Check `preview_console_logs` for zero errors
+   - Check `list_console_messages` for zero errors (filter to `level === 'error'`)
 4. **Check for related issues:**
    - Does the same pattern exist elsewhere? (Use `grep` to search)
    - If yes, fix all instances

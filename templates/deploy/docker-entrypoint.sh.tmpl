@@ -1,0 +1,29 @@
+#!/bin/bash
+# Container entrypoint for {{project.name}}.
+# Customize for your stack — current scaffold assumes Django-style migrate/collectstatic.
+set -euo pipefail
+
+echo "Starting {{project.name}}..."
+
+{{#if backend}}
+# Wait for database if DATABASE_URL is set
+if [ -n "${DATABASE_URL:-}" ]; then
+  echo "Waiting for database..."
+  HOST="${POSTGRES_HOST:-postgres}"
+  PORT="${POSTGRES_PORT:-5432}"
+  while ! (echo > "/dev/tcp/$HOST/$PORT") 2>/dev/null; do
+    sleep 1
+  done
+  echo "Database is ready."
+fi
+
+# Django-style: run migrations and collect static if manage.py exists.
+if [ -f "manage.py" ]; then
+  echo "Running migrations..."
+  python3 manage.py migrate --noinput
+  echo "Collecting static files..."
+  python3 manage.py collectstatic --noinput || true
+fi
+{{/if}}
+
+exec "$@"

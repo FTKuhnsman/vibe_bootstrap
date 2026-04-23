@@ -73,7 +73,7 @@ Use slash commands to drive the multi-agent coordinated workflow:
 | `/implement F-XXX` | New feature end-to-end (plan → TDD → agents → smoke test) |
 | `/fix-bug B-XXX` | Bug fix (reproduce → failing test → fix → verify) |
 | `/refactor [desc]` | Refactoring (analyze → TDD → agents → verify) |
-| `/verify-ui [flow]` | Browser smoke test using Claude Preview tools |
+| `/verify-ui [flow]` | Browser smoke test via chrome-devtools MCP |
 | `/review` | Pre-PR code review |
 | `/test [component]` | Generate tests for a component |
 | `/spec [file]` | Generate or update spec files |
@@ -104,6 +104,60 @@ All implementation follows: **Plan → TDD → Parallel Agents → Verify → Sm
 - No file ownership overlap between concurrent agents
 - Progress tracked in `docs/plan/PROGRESS_*.md` for session resilience
 
+### Agent Dispatch Specification
+
+Every agent dispatch in a plan MUST include these five fields:
+
+| Field | Purpose | Example |
+|-------|---------|---------|
+| **Files to read** | Reference context (read-only) | `core/models.py`, `core/tests/test_permissions.py` |
+| **Files to modify** | Ownership — only this agent touches these | `core/permissions.py`, `core/signals.py` |
+| **Work** | Bullet list of specific tasks | "Create `can_view_module()` with organizer bypass; emit signal on grant/revoke" |
+| **Completion criteria** | How to verify the agent succeeded | "Permission and signal tests pass" |
+| **Scope guard** | What the agent must NOT touch | "Only `core/permissions.py` and `core/signals.py` — no view or model changes" |
+
+**Rules:**
+- No file ownership overlap between concurrent agents — if two need the same file, run them sequentially
+- Each agent batch is followed by a test suite run before the next batch starts
+- Group agents to maximize parallelism: backend agents alongside frontend agents when independent
+- Maximum 3 concurrent agents per batch to keep context manageable
+
+### TDD Step Structure
+
+Each implementation step follows red → green → verify:
+
+1. **RED step** — A dedicated test-writing agent creates failing tests that define the expected contract
+   - Tests MUST be written before implementation
+   - The test agent's scope guard explicitly forbids implementing models/views/components
+   - Commit failing tests: `test(F-XXX): add failing tests for [component]`
+
+2. **GREEN step** — Implementation agents (parallel where independent) make tests pass
+   - Each implementation agent reads the failing tests as part of its reference context
+   - Commit when all tests pass: `feat(F-XXX): implement [component]`
+
+3. **VERIFY** — Full test suite run between every step
+   - Fix regressions immediately before proceeding to the next step
+
+### Discovery-to-Implementation Bridge
+
+When `/feature discovery` produces a discovery doc, the implementation plan MUST include:
+
+1. **Step 0 (Setup):**
+   - Create feature branch off the integration branch
+   - Create `docs/plan/PROGRESS_F-XXX.md` with checkboxes for every step
+   - Save the discovery doc to `docs/plan/discovery/F-XXX-feature-name.md`
+   - Record any new architecture decisions in `docs/plan/DECISIONS.md` (auto-assign D-XXX IDs)
+   - Add or update feature entries in `docs/plan/FEATURES.md`
+   - Commit: `docs: add F-XXX discovery and decisions`
+
+2. **Steps 1-N (TDD cycles):** Each cycle is a RED → GREEN → VERIFY → COMMIT sequence with explicit agent dispatches per the Agent Dispatch Specification
+
+3. **Integration Verify:** Full backend + frontend test suites, linting, build check — all from the Verification Checklist
+
+4. **Browser Smoke Test:** `/verify-ui` with the specific scenarios listed in the discovery doc (skip if no UI impact)
+
+5. **Documentation Cleanup:** Update FEATURES.md (mark acceptance criteria checked), ACTIVE.md (move to completed), the PROGRESS file (final checkboxes), DECISIONS.md (any new D-XXX), and BUGS.md (close any bugs fixed in passing)
+
 ### Session Resilience
 
 If a session dies mid-implementation:
@@ -132,6 +186,65 @@ Example:
 
 _Run `/spec` to help populate this section based on your app's routes and features._
 
+## Browser Smoke Test Playbook
+
+Reference for `/verify-ui` and manual browser smoke testing via the chrome-devtools MCP. Populate the subsections below with your stack-specific gotchas as you discover them — these placeholders are starting points, not exhaustive.
+
+### Prerequisites
+
+<!-- Document anything required before flows can run:
+- Test user(s) and how to create them (e.g., a Django shell snippet)
+- Auth token storage location (e.g., localStorage key name)
+- Required env vars or feature flags
+- Seed data or fixtures
+-->
+
+### Creating Test Data
+
+<!-- When form submission fails (e.g., React-controlled inputs that ignore native DOM events,
+custom date pickers, RN TextInputs), create data via API using `evaluate_script`:
+
+```js
+const token = localStorage.getItem('<your-token-key>');
+const res = await fetch('/api/<resource>/', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+  body: JSON.stringify({...})
+});
+return res.status;
+```
+
+Then `navigate_page` directly to the page under test.
+-->
+
+### Clicking Elements
+
+<!-- Selector strategy:
+- Prefer `[data-testid="..."]` and `[aria-label="..."]` selectors
+- Pseudo-selectors like `:has-text()` are NOT supported
+- If `click` doesn't trigger a React state update, fall back to `evaluate_script` with `document.querySelector('selector').click()`
+-->
+
+### Portal/Modal Components
+
+<!-- Components rendered via portal to `document.body` (modals, toasts, bottom sheets) may
+not appear in `take_snapshot`. Query them directly via `evaluate_script`:
+`document.querySelector('[data-testid="..."]')` or `[role="dialog"]`.
+
+`take_screenshot` may time out when modals/overlays are open — use `evaluate_script` to
+inspect DOM instead.
+-->
+
+### Verification Order
+
+1. `list_console_messages` — zero errors required (filter `level === 'error'`)
+2. `take_snapshot` — page structure and text content
+3. `evaluate_script` — DOM inspection, portal components, debug state
+4. `list_network_requests` — confirm API calls succeeded (no non-2xx)
+5. `take_screenshot` — visual proof (skip if it times out with modals open)
+
+<!-- Populate stack-specific gotchas above as you discover them. -->
+
 ## Environment Variables
 
 | Variable | Default | Notes |
@@ -151,6 +264,28 @@ _Run `/spec` to help populate this section based on your app's routes and featur
 {{/if}}- [ ] Dev servers start without errors
 - [ ] Zero console errors in browser
 
+{{#if deploy}}
+## Deployment
+
+This project ships with semver-tag-driven deploy scripts (`deploy.sh`, `deploy.ps1`) that build a Docker image and trigger a Portainer-style redeploy webhook.
+
+```bash
+./deploy.sh dev patch    # bump patch, build, push, redeploy dev stack
+./deploy.sh prod minor   # bump minor, tag (on {{git.main_branch}}), push, redeploy prod stack
+
+# Windows
+.\deploy.ps1 prod patch
+```
+
+Required environment (in `.env` or environment):
+- `PORTAINER_WEBHOOK_URL` — prod stack redeploy webhook
+- `PORTAINER_DEV_WEBHOOK_URL` — dev stack redeploy webhook
+
+Image: `{{deploy.image}}` (override by editing `IMAGE` in `deploy.sh` / `$Image` in `deploy.ps1`).
+
+The `Dockerfile` is a starting point — adjust the build/runtime commands for your stack.
+
+{{/if}}
 ## Spec Files
 
 | File | Purpose | Command |

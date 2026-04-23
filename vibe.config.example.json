@@ -36,5 +36,6 @@
     "main_branch": "main",
     "commit_convention": "conventional"
   },
-  "platform": "auto"
+  "platform": "auto",
+  "deploy": null
 }

@@ -370,6 +370,22 @@ def render_claude_md(config: dict) -> str:
     return render_template(template, config)
 
 
+def render_template_file(name: str, config: dict) -> str:
+    """Render an arbitrary template under templates/ by relative path."""
+    tmpl_path = TEMPLATES_DIR / name
+    if not tmpl_path.exists():
+        return ""
+    with open(tmpl_path, "r", encoding="utf-8") as f:
+        template = f.read()
+    return render_template(template, config)
+
+
+def slugify_image_name(name: str) -> str:
+    """Turn a project name into a Docker-image-safe slug."""
+    s = re.sub(r"[^a-zA-Z0-9_-]+", "-", name).strip("-").lower()
+    return s or "app"
+
+
 # ---------------------------------------------------------------------------
 # File writer with overwrite protection
 # ---------------------------------------------------------------------------
@@ -447,6 +463,15 @@ def install_config_files(target: Path, config: dict, force: bool):
         ".claude/launch.json"
     )
 
+    # .gitignore — never clobber an existing .gitignore (user may have customized it)
+    gi_target = target / ".gitignore"
+    if not gi_target.exists():
+        gi = render_template_file(".gitignore.tmpl", config)
+        if gi:
+            write_file(gi_target, gi, force=True, label=".gitignore")
+    else:
+        print(f"  {'.gitignore':<45} SKIPPED (exists)")
+
     # vibe.config.json
     write_file(
         target / "vibe.config.json",
@@ -456,6 +481,46 @@ def install_config_files(target: Path, config: dict, force: bool):
     )
 
 
+def install_deploy_files(target: Path, config: dict, force: bool):
+    """Render deploy templates into project root when deploy is enabled."""
+    # An empty dict is falsy; check for explicit dict presence instead.
+    if not isinstance(config.get("deploy"), dict):
+        return
+
+    # Mark whether the frontend has a build_command — the Dockerfile needs it
+    if config.get("frontend") and config["frontend"].get("build_command"):
+        config.setdefault("deploy", {})["has_build"] = True
+
+    # deploy.sh + deploy.ps1
+    for name in ("deploy.sh", "deploy.ps1"):
+        content = render_template_file(f"deploy/{name}.tmpl", config)
+        if not content:
+            continue
+        path = target / name
+        wrote = write_file(path, content, force, name)
+        if wrote and name.endswith(".sh"):
+            try:
+                os.chmod(path, 0o755)
+            except OSError:
+                pass  # best-effort on Windows
+
+    # Dockerfile + docker-entrypoint.sh
+    for tmpl_name, out_name in (
+        ("deploy/Dockerfile.tmpl", "Dockerfile"),
+        ("deploy/docker-entrypoint.sh.tmpl", "docker-entrypoint.sh"),
+    ):
+        content = render_template_file(tmpl_name, config)
+        if not content:
+            continue
+        path = target / out_name
+        wrote = write_file(path, content, force, out_name)
+        if wrote and out_name.endswith(".sh"):
+            try:
+                os.chmod(path, 0o755)
+            except OSError:
+                pass
+
+
 def install_all(target: Path, config: dict, force: bool):
     """Full installation: commands + docs + specs + config files."""
     print("\nCreating files...")
@@ -463,6 +528,7 @@ def install_all(target: Path, config: dict, force: bool):
     install_docs(target, force)
     install_specs(target, force)
     install_config_files(target, config, force)
+    install_deploy_files(target, config, force)
 
 
 # ---------------------------------------------------------------------------
@@ -690,6 +756,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Overwrite existing files without prompting",
     )
+    parser.add_argument(
+        "--with-deploy",
+        action="store_true",
+        help="Scaffold deploy.sh/.ps1 + Dockerfile + docker-entrypoint.sh "
+             "(semver tag bump + Docker build/push + Portainer-style webhook).",
+    )
     return parser.parse_args()
 
 
@@ -736,6 +808,16 @@ def main():
         config["project"].setdefault("description", "")
     else:
         config = interactive_wizard()
+
+    # Deploy is opt-in via flag OR preset/config field. Flag wins if set.
+    # NOTE: an empty dict is falsy in Python, so do not gate on `if config.get("deploy")`.
+    if args.with_deploy and config.get("deploy") is None:
+        config["deploy"] = {"enabled": True}
+    if isinstance(config.get("deploy"), dict):
+        deploy = config["deploy"]
+        deploy.setdefault(
+            "image", slugify_image_name(config.get("project", {}).get("name", "app"))
+        )
 
     install_all(target, config, args.force)
     print_next_steps()

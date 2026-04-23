@@ -7,12 +7,14 @@ Reusable development workflow for [Claude Code](https://claude.ai/claude-code). 
 Building software with Claude Code is powerful, but the workflow — slash commands, planning docs, spec files, auto-format hooks, browser smoke testing, session resilience — takes time to set up from scratch. This repo packages all of that into a reusable bootstrap.
 
 **What you get:**
-- 15 slash commands for the full development lifecycle
+- 16 slash commands for the full development lifecycle
 - Planning system (features, bugs, decisions, dependencies, discovery)
 - Spec files for deep project context (stack, architecture, conventions, API)
-- Auto-format hooks (lint on save)
-- Browser smoke testing via Claude Preview tools
-- Multi-agent coordination with session resilience (progress files survive context loss)
+- Auto-format hooks (lint on save) + protected-file blocks
+- Browser smoke testing via the [chrome-devtools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp)
+- Multi-agent coordination with TDD step structure, dispatch specification, and session resilience (progress files survive context loss)
+- Two-tier permissions: shared `settings.json` + machine-specific `settings.local.json`
+- Optional deploy automation: `--with-deploy` adds `deploy.sh` / `deploy.ps1` (semver-bump + Docker build/push + redeploy webhook), `Dockerfile`, and `docker-entrypoint.sh`
 
 ## Quick Start
 
@@ -22,8 +24,9 @@ git clone https://github.com/FTKuhnsman/vibe_bootstrap.git my-project
 cd my-project
 rm -rf .git  # Remove bootstrap git history
 
-# 2. Run setup with a preset
+# 2. Run setup with a preset (add --with-deploy if you want Docker/Portainer-style deploy scripts)
 python setup.py --preset django-react
+# python setup.py --preset django-react --with-deploy
 
 # 3. Initialize your own repo
 git init && git add -A && git commit -m "Initial commit with vibe_bootstrap"
@@ -66,7 +69,7 @@ git init && git add -A && git commit -m "Initial commit with vibe_bootstrap"
 |---------|-------------|
 | `/review` | Pre-PR code review (security, performance, a11y, correctness) |
 | `/test [component]` | Generate comprehensive tests (happy path, errors, edge cases) |
-| `/verify-ui [flow]` | Browser smoke test via Claude Preview tools |
+| `/verify-ui [flow]` | Browser smoke test via chrome-devtools MCP |
 | `/clean-up` | Code quality review of current diff |
 
 ### Project Management
@@ -151,6 +154,22 @@ python setup.py --docs-only       # Just planning docs
 python setup.py --specs-only      # Just spec templates
 ```
 
+### Opt-in deploy automation
+
+```bash
+python setup.py --preset django-react --with-deploy
+```
+
+Adds `deploy.sh` + `deploy.ps1` (semver-bump from latest git tag, build + push Docker image, trigger a redeploy webhook), a multi-stage `Dockerfile`, and `docker-entrypoint.sh`. Assumes a Portainer-style webhook deploy model (`PORTAINER_WEBHOOK_URL` / `PORTAINER_DEV_WEBHOOK_URL` in `.env`). Skip the flag if your deploy target is different — the scripts are a starting point, not a hard requirement.
+
+### Settings (two-tier permissions)
+
+The generated `.claude/settings.json` is the team-shared, version-controlled permission set. The runtime also merges `.claude/settings.local.json` if present — that file is gitignored by default. Use it for machine-specific or experimental permission grants without polluting the shared config (e.g., new MCP servers you're trying out, ad-hoc Bash prefixes a teammate doesn't need).
+
+### Browser automation requirement
+
+`/verify-ui`, `/implement`, `/fix-bug`, and `/refactor` reference the [chrome-devtools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) for browser smoke testing. Install and configure that MCP in your Claude Code settings — the bootstrap commands assume tools named `mcp__chrome-devtools__*` are available.
+
 ### Adding custom commands
 
 Add `.md` files to `.claude/commands/` with YAML frontmatter:
@@ -176,10 +195,12 @@ allowed-tools:
 ```
 your-project/
 ├── .claude/
-│   ├── commands/          # 15 slash commands
-│   ├── settings.json      # Permissions + auto-format hooks
+│   ├── commands/          # 16 slash commands
+│   ├── settings.json      # Permissions + auto-format hooks (committed)
+│   ├── settings.local.json # (gitignored) machine-specific perms — created by Claude Code on demand
 │   └── launch.json        # Dev server configs
-├── CLAUDE.md              # Project guide (stack, workflow, conventions)
+├── .gitignore             # Generated; preserves any existing one
+├── CLAUDE.md              # Project guide (stack, workflow, conventions, dispatch spec, smoke playbook)
 ├── docs/
 │   ├── plan/
 │   │   ├── FEATURES.md    # Feature backlog
@@ -193,7 +214,12 @@ your-project/
 │       ├── ARCHITECTURE.md # System design
 │       ├── CONVENTIONS.md  # Code patterns
 │       └── API.md          # API contracts
-└── vibe.config.json        # Bootstrap config (for re-runs)
+├── vibe.config.json        # Bootstrap config (for re-runs)
+└── (with --with-deploy:)
+    ├── deploy.sh           # bash: bump semver, build, push, redeploy
+    ├── deploy.ps1          # PowerShell equivalent
+    ├── Dockerfile          # Multi-stage; customize for your stack
+    └── docker-entrypoint.sh
 ```
 
 ## FAQ
@@ -204,8 +230,8 @@ Yes. Run `python setup.py --target /path/to/existing/project`. It won't overwrit
 **Q: What if my stack isn't in the presets?**
 Use `python setup.py` (interactive mode) and select "Custom" to configure manually. Or copy the closest preset and edit `vibe.config.json`.
 
-**Q: Do I need Claude Preview MCP tools for `/verify-ui`?**
-The `/verify-ui` command uses Claude Preview tools for browser automation. If you don't have them, you can still use all other commands. Manual browser testing works fine as an alternative.
+**Q: Do I need the chrome-devtools MCP for `/verify-ui`?**
+Yes — `/verify-ui` (and the smoke-test phase of `/implement`, `/fix-bug`, `/refactor`) call tools named `mcp__chrome-devtools__*`. Install the [chrome-devtools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) in your Claude Code settings. If you skip it, the other 15 commands still work — just do browser testing manually.
 
 **Q: How do I update the bootstrap in an existing project?**
 Re-run `python setup.py` with your existing `vibe.config.json`. It will regenerate config files and offer to update commands.
