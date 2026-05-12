@@ -1,6 +1,10 @@
 # {{project.name}}
 
-**Purpose**: {{project.description}}
+**Purpose:** {{project.description}}
+
+> This file is the project's **map**, not its encyclopedia. It points to the documents agents and humans should read for deeper context. Inspired by OpenAI's [harness engineering](https://openai.com/index/harness-engineering/) methodology — keep this file short; put detail in `docs/spec/`.
+>
+> `AGENTS.md` mirrors this file for cross-tool compatibility (Codex, Cursor, Copilot). Keep both in sync.
 
 ## Stack
 
@@ -8,16 +12,26 @@
 |-------|------|
 {{#if backend}}| **Backend** | {{backend.language}} ({{backend.framework}}) |
 {{/if}}{{#if frontend}}| **Frontend** | {{frontend.language}} ({{frontend.framework}}) |
-{{/if}}| **Testing** | See Testing & Linting section |
-| **Package Managers** | {{package_managers}} |
+{{/if}}| **Package managers** | {{package_managers}} |
 
-## Architecture
+Full stack details: `docs/spec/STACK.md`.
 
-See `docs/spec/ARCHITECTURE.md` for detailed system design.
+## Reading order for agents
 
-Run `/spec architecture` to generate or update.
+Read in this order when joining a task. Each file has a specific job — don't skip:
 
-## Running Locally
+1. **`docs/spec/GOLDEN_PRINCIPLES.md`** — mechanical rules (`GP-NNN`). Reference by ID in commits and dispatches.
+2. **`docs/spec/ARCHITECTURE.md`** — system design and data flow.
+3. **`docs/spec/LAYERS.md`** — canonical dependency direction (enforced by `GP-006` and `/check-layers`).
+4. **`docs/spec/CONVENTIONS.md`** — naming, error handling, testing patterns.
+5. **`docs/spec/API.md`** — endpoint contracts.
+6. **`docs/spec/AGENT_DISPATCH.md`** — the five-field dispatch spec for `/implement`, `/refactor`, `/fix-bug`.
+7. **`docs/spec/SMOKE_TEST.md`** — browser-test playbook for `/verify-ui`.
+8. **`docs/plan/FEATURES.md`** + **`docs/plan/ACTIVE.md`** — what to build and what's in flight.
+9. **`docs/plan/DECISIONS.md`** + **`docs/plan/DEPENDENCIES.md`** — accepted decisions and change-impact.
+10. **`docs/plan/discovery/F-XXX-*.md`** — feature-specific design discovery, when working on F-XXX.
+
+## Running locally
 
 {{#if backend}}
 ### Backend
@@ -36,238 +50,72 @@ cd {{frontend.directory}}
 ```
 {{/if}}
 
-## Testing & Linting
+## Testing & linting
 
 ```bash
 {{#if backend}}
-# Backend tests
+# Backend
 {{backend.test_command}}
-
-# Backend lint
 {{backend.lint_command}}
 {{/if}}
 {{#if frontend}}
-# Frontend tests
+# Frontend
 {{frontend.test_command}}
-
-# Frontend lint
 {{frontend.lint_command}}
-
-# Frontend build
 {{frontend.build_command}}
 {{/if}}
 ```
 
-## Conventions
-
-See `docs/spec/CONVENTIONS.md` for detailed coding patterns and standards.
-
-Run `/spec conventions` to generate or update.
-
-## Development Workflow
-
-Use slash commands to drive the multi-agent coordinated workflow:
+## Commands
 
 | Command | When to use |
 |---------|-------------|
 | `/implement F-XXX` | New feature end-to-end (plan → TDD → agents → smoke test) |
 | `/fix-bug B-XXX` | Bug fix (reproduce → failing test → fix → verify) |
 | `/refactor [desc]` | Refactoring (analyze → TDD → agents → verify) |
+| `/garbage-collect` | Scan for Golden Principle drift, propose targeted cleanup |
+| `/check-layers` | Verify dependency direction matches `docs/spec/LAYERS.md` |
 | `/verify-ui [flow]` | Browser smoke test via chrome-devtools MCP |
-| `/review` | Pre-PR code review |
+| `/review` | Pre-PR code review (consults GP, security, perf, a11y) |
 | `/test [component]` | Generate tests for a component |
+| `/clean-up` | Code-quality review of the current diff, applies GP auto-fix hints |
 | `/spec [file]` | Generate or update spec files |
-| `/status` | Quick project dashboard |
-| `/feature [cmd]` | Manage feature backlog |
-| `/bug [cmd]` | Manage bug tracker |
-| `/task [cmd]` | Manage tasks |
-| `/plan [filter]` | View project status |
+| `/status`, `/plan` | Project dashboards |
+| `/feature [cmd]`, `/bug [cmd]`, `/task [cmd]` | Backlog management |
 | `/commit-push-pr` | Git workflow automation |
 | `/next-phase` | Execute next development phase |
-| `/clean-up` | Code quality review of diff |
 
-### Workflow Pattern
+## Workflow pattern
 
-All implementation follows: **Plan → TDD → Parallel Agents → Verify → Smoke Test → Commit**
+All implementation follows: **Plan → TDD → Parallel Agents → Verify → Smoke Test → Commit.**
 
-1. **Plan**: Read context (FEATURES.md, DECISIONS.md, DEPENDENCIES.md, specs, CLAUDE.md), design approach, get user approval
-2. **TDD**: Write failing tests first that define expected behavior
-3. **Implement**: Dispatch parallel agents (backend + frontend independent), each with file ownership (no overlap)
-4. **Verify**: Run full test suite after each batch, fix regressions immediately
-5. **Smoke Test**: Browser verification via `/verify-ui` — zero console errors required
-6. **Commit**: One commit per logical step using conventional format
+See `docs/spec/AGENT_DISPATCH.md` for the dispatch contract every step must honor. See `docs/spec/SMOKE_TEST.md` for the browser-test playbook.
 
-### Agent Dispatch Rules
-
-- Each agent gets: files to read (reference), files to modify (ownership), completion criteria, scope guard
-- Backend and frontend agents run in parallel when independent
-- No file ownership overlap between concurrent agents
-- Progress tracked in `docs/plan/PROGRESS_*.md` for session resilience
-
-### Agent Dispatch Specification
-
-Every agent dispatch in a plan MUST include these five fields:
-
-| Field | Purpose | Example |
-|-------|---------|---------|
-| **Files to read** | Reference context (read-only) | `core/models.py`, `core/tests/test_permissions.py` |
-| **Files to modify** | Ownership — only this agent touches these | `core/permissions.py`, `core/signals.py` |
-| **Work** | Bullet list of specific tasks | "Create `can_view_module()` with organizer bypass; emit signal on grant/revoke" |
-| **Completion criteria** | How to verify the agent succeeded | "Permission and signal tests pass" |
-| **Scope guard** | What the agent must NOT touch | "Only `core/permissions.py` and `core/signals.py` — no view or model changes" |
-
-**Rules:**
-- No file ownership overlap between concurrent agents — if two need the same file, run them sequentially
-- Each agent batch is followed by a test suite run before the next batch starts
-- Group agents to maximize parallelism: backend agents alongside frontend agents when independent
-- Maximum 3 concurrent agents per batch to keep context manageable
-
-### TDD Step Structure
-
-Each implementation step follows red → green → verify:
-
-1. **RED step** — A dedicated test-writing agent creates failing tests that define the expected contract
-   - Tests MUST be written before implementation
-   - The test agent's scope guard explicitly forbids implementing models/views/components
-   - Commit failing tests: `test(F-XXX): add failing tests for [component]`
-
-2. **GREEN step** — Implementation agents (parallel where independent) make tests pass
-   - Each implementation agent reads the failing tests as part of its reference context
-   - Commit when all tests pass: `feat(F-XXX): implement [component]`
-
-3. **VERIFY** — Full test suite run between every step
-   - Fix regressions immediately before proceeding to the next step
-
-### Discovery-to-Implementation Bridge
-
-When `/feature discovery` produces a discovery doc, the implementation plan MUST include:
-
-1. **Step 0 (Setup):**
-   - Create feature branch off the integration branch
-   - Create `docs/plan/PROGRESS_F-XXX.md` with checkboxes for every step
-   - Save the discovery doc to `docs/plan/discovery/F-XXX-feature-name.md`
-   - Record any new architecture decisions in `docs/plan/DECISIONS.md` (auto-assign D-XXX IDs)
-   - Add or update feature entries in `docs/plan/FEATURES.md`
-   - Commit: `docs: add F-XXX discovery and decisions`
-
-2. **Steps 1-N (TDD cycles):** Each cycle is a RED → GREEN → VERIFY → COMMIT sequence with explicit agent dispatches per the Agent Dispatch Specification
-
-3. **Integration Verify:** Full backend + frontend test suites, linting, build check — all from the Verification Checklist
-
-4. **Browser Smoke Test:** `/verify-ui` with the specific scenarios listed in the discovery doc (skip if no UI impact)
-
-5. **Documentation Cleanup:** Update FEATURES.md (mark acceptance criteria checked), ACTIVE.md (move to completed), the PROGRESS file (final checkboxes), DECISIONS.md (any new D-XXX), and BUGS.md (close any bugs fixed in passing)
-
-### Session Resilience
-
-If a session dies mid-implementation:
-- Check `docs/plan/PROGRESS_*.md` for the last completed sub-step
-- Resume from the next incomplete sub-step
-- All committed work is safe
-- Use `/implement --resume` to auto-detect and continue
-
-## Smoke Test Flows
-
-<!-- Define app-specific browser test flows here for /verify-ui to execute.
-Example:
-
-### Auth Flow
-1. Navigate to /login
-2. Verify login form renders
-3. Fill email and password, submit
-4. Verify redirect to dashboard
-
-### Main Feature Flow
-1. Navigate to /dashboard
-2. Click "Create New"
-3. Fill form and submit
-4. Verify item appears in list
--->
-
-_Run `/spec` to help populate this section based on your app's routes and features._
-
-## Browser Smoke Test Playbook
-
-Reference for `/verify-ui` and manual browser smoke testing via the chrome-devtools MCP. Populate the subsections below with your stack-specific gotchas as you discover them — these placeholders are starting points, not exhaustive.
-
-### Prerequisites
-
-<!-- Document anything required before flows can run:
-- Test user(s) and how to create them (e.g., a Django shell snippet)
-- Auth token storage location (e.g., localStorage key name)
-- Required env vars or feature flags
-- Seed data or fixtures
--->
-
-### Creating Test Data
-
-<!-- When form submission fails (e.g., React-controlled inputs that ignore native DOM events,
-custom date pickers, RN TextInputs), create data via API using `evaluate_script`:
-
-```js
-const token = localStorage.getItem('<your-token-key>');
-const res = await fetch('/api/<resource>/', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-  body: JSON.stringify({...})
-});
-return res.status;
-```
-
-Then `navigate_page` directly to the page under test.
--->
-
-### Clicking Elements
-
-<!-- Selector strategy:
-- Prefer `[data-testid="..."]` and `[aria-label="..."]` selectors
-- Pseudo-selectors like `:has-text()` are NOT supported
-- If `click` doesn't trigger a React state update, fall back to `evaluate_script` with `document.querySelector('selector').click()`
--->
-
-### Portal/Modal Components
-
-<!-- Components rendered via portal to `document.body` (modals, toasts, bottom sheets) may
-not appear in `take_snapshot`. Query them directly via `evaluate_script`:
-`document.querySelector('[data-testid="..."]')` or `[role="dialog"]`.
-
-`take_screenshot` may time out when modals/overlays are open — use `evaluate_script` to
-inspect DOM instead.
--->
-
-### Verification Order
-
-1. `list_console_messages` — zero errors required (filter `level === 'error'`)
-2. `take_snapshot` — page structure and text content
-3. `evaluate_script` — DOM inspection, portal components, debug state
-4. `list_network_requests` — confirm API calls succeeded (no non-2xx)
-5. `take_screenshot` — visual proof (skip if it times out with modals open)
-
-<!-- Populate stack-specific gotchas above as you discover them. -->
-
-## Environment Variables
-
-| Variable | Default | Notes |
-|----------|---------|-------|
-| `SECRET_KEY` | (required) | Application secret |
-| `DEBUG` | `True` | Set `False` in production |
-
-<!-- Add your environment variables here -->
-
-## Verification Checklist
+## Verification checklist
 
 {{#if backend}}- [ ] Backend tests pass: `{{backend.test_command}}`
 - [ ] Backend lint clean: `{{backend.lint_command}}`
 {{/if}}{{#if frontend}}- [ ] Frontend tests pass: `{{frontend.test_command}}`
 - [ ] Frontend build succeeds: `{{frontend.build_command}}`
 - [ ] Frontend lint clean: `{{frontend.lint_command}}`
-{{/if}}- [ ] Dev servers start without errors
+{{/if}}- [ ] `/check-layers` clean (no backward imports)
+- [ ] `/garbage-collect --dry-run` reports no critical drift
+- [ ] Dev servers start without errors
 - [ ] Zero console errors in browser
+
+## Environment variables
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `SECRET_KEY` | (required) | Application secret |
+| `DEBUG` | `True` | Set `False` in production |
+
+<!-- Add your environment variables here. Per GP-011, runtime code reads via the config module, not os.environ directly. -->
 
 {{#if deploy}}
 ## Deployment
 
-This project ships with semver-tag-driven deploy scripts (`deploy.sh`, `deploy.ps1`) that build a Docker image and trigger a Portainer-style redeploy webhook.
+Semver-tag-driven scripts: `deploy.sh` / `deploy.ps1` build a Docker image and trigger a Portainer-style redeploy webhook.
 
 ```bash
 ./deploy.sh dev patch    # bump patch, build, push, redeploy dev stack
@@ -277,33 +125,13 @@ This project ships with semver-tag-driven deploy scripts (`deploy.sh`, `deploy.p
 .\deploy.ps1 prod patch
 ```
 
-Required environment (in `.env` or environment):
+Required env (in `.env` or environment):
 - `PORTAINER_WEBHOOK_URL` — prod stack redeploy webhook
 - `PORTAINER_DEV_WEBHOOK_URL` — dev stack redeploy webhook
 
-Image: `{{deploy.image}}` (override by editing `IMAGE` in `deploy.sh` / `$Image` in `deploy.ps1`).
-
-The `Dockerfile` is a starting point — adjust the build/runtime commands for your stack.
-
+Image: `{{deploy.image}}` (override `IMAGE` in `deploy.sh` / `$Image` in `deploy.ps1`).
 {{/if}}
-## Spec Files
 
-| File | Purpose | Command |
-|------|---------|---------|
-| `docs/spec/STACK.md` | Languages, frameworks, versions | `/spec stack` |
-| `docs/spec/ARCHITECTURE.md` | System design, data flow | `/spec architecture` |
-| `docs/spec/CONVENTIONS.md` | Code patterns, standards | `/spec conventions` |
-| `docs/spec/API.md` | API contracts, endpoints | `/spec api` |
+## Known issues & gotchas
 
-## Planning System
-
-See `docs/plan/`:
-- **FEATURES.md** — Feature roadmap and acceptance criteria
-- **ACTIVE.md** — Current sprint tracker
-- **BUGS.md** — Known bugs by severity
-- **DECISIONS.md** — Architecture decision records
-- **DEPENDENCIES.md** — Change impact analysis
-
-## Known Issues & Gotchas
-
-<!-- Add project-specific gotchas here -->
+<!-- Add project-specific gotchas here. For browser-test-specific gotchas, put them in docs/spec/SMOKE_TEST.md instead. -->

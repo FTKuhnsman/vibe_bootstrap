@@ -40,9 +40,12 @@ Refactor code safely using TDD, parallel agents, and verification gates.
 1. **Understand the refactoring scope:**
    - Read the affected files
    - Identify the pattern to extract, simplify, or reorganize
+   - Read `docs/spec/GOLDEN_PRINCIPLES.md` — refactoring often touches several GP rules; name which ones apply
+   - Read `docs/spec/AGENT_DISPATCH.md` — for the dispatch contract
+   - Read `docs/spec/LAYERS.md` — confirm the refactor doesn't create backward imports
    - Check `docs/plan/DEPENDENCIES.md` for impact analysis
    - Check `docs/spec/CONVENTIONS.md` for target patterns
-   - Check `CLAUDE.md` for relevant standards
+   - Check `CLAUDE.md` for the navigation map
 
 2. **Enter plan mode** and design the refactoring:
    - Break into small, verifiable steps
@@ -99,3 +102,4 @@ For each refactoring step:
 - **Extract, don't rewrite** — prefer incremental extraction over big-bang rewrites
 - **Test the abstraction** — new patterns (mixins, factories, utils) get their own tests
 - **Backward compatibility** — re-export from old locations when moving code
+- **Honor the Golden Principles** — refactors that violate `GP-NNN` are not refactors, they're regressions. Run `/check-layers` and `/garbage-collect --report` after each step.

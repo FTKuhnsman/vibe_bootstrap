@@ -27,12 +27,18 @@ Interactive discovery and generation of project specification files in `docs/spe
 
 ## Spec Files
 
-| File | Purpose |
-|------|---------|
-| `docs/spec/STACK.md` | Languages, frameworks, versions, package managers, dev tools |
-| `docs/spec/ARCHITECTURE.md` | System design, data flow, directory structure, auth, state management |
-| `docs/spec/CONVENTIONS.md` | Naming, error handling, validation, testing patterns, code organization |
-| `docs/spec/API.md` | Endpoint patterns, auth scheme, request/response formats, errors |
+`/spec` populates these four files. The remaining files in `docs/spec/` (GOLDEN_PRINCIPLES.md, AGENT_DISPATCH.md, LAYERS.md, SMOKE_TEST.md) ship pre-populated by the bootstrap — curate them by hand, not via `/spec`.
+
+| File | Purpose | Managed by |
+|------|---------|------------|
+| `docs/spec/STACK.md` | Languages, frameworks, versions, package managers, dev tools | `/spec stack` |
+| `docs/spec/ARCHITECTURE.md` | System design, data flow, directory structure, auth, state management | `/spec architecture` |
+| `docs/spec/CONVENTIONS.md` | Naming, error handling, validation, testing patterns, code organization | `/spec conventions` |
+| `docs/spec/API.md` | Endpoint patterns, auth scheme, request/response formats, errors | `/spec api` |
+| `docs/spec/GOLDEN_PRINCIPLES.md` | Mechanical, agent-actionable rules (GP-NNN) | hand-edited |
+| `docs/spec/AGENT_DISPATCH.md` | Five-field dispatch contract, TDD step structure | hand-edited |
+| `docs/spec/LAYERS.md` | Canonical dependency direction; enforced by `/check-layers` | hand-edited |
+| `docs/spec/SMOKE_TEST.md` | Browser-test playbook for `/verify-ui` | hand-edited |
 
 ## Process
 

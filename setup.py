@@ -3,8 +3,10 @@
 vibe_bootstrap setup wizard.
 
 Zero-dependency interactive setup for Claude Code projects.
-Generates CLAUDE.md, slash commands, planning docs, spec templates,
-and .claude/ configuration from presets or custom config.
+Generates CLAUDE.md + AGENTS.md, slash commands, planning docs,
+spec templates (including GOLDEN_PRINCIPLES.md, AGENT_DISPATCH.md,
+LAYERS.md, SMOKE_TEST.md), and .claude/ configuration from presets
+or custom config.
 
 Usage:
     python setup.py                          # Interactive wizard
@@ -444,10 +446,14 @@ def install_specs(target: Path, force: bool):
 
 def install_config_files(target: Path, config: dict, force: bool):
     """Generate and install rendered config files."""
-    # CLAUDE.md
+    # CLAUDE.md + AGENTS.md (identical content; AGENTS.md is the cross-tool
+    # convention for Codex/Cursor/Copilot, CLAUDE.md is Claude Code's native).
+    # Both get the same body so agents in any tool see the same map. Users who
+    # only care about one tool can delete the other after setup.
     content = render_claude_md(config)
     if content:
         write_file(target / "CLAUDE.md", content, force, "CLAUDE.md")
+        write_file(target / "AGENTS.md", content, force, "AGENTS.md")
 
     # .claude/settings.json
     settings = build_settings_json(config)
@@ -767,10 +773,12 @@ def parse_args() -> argparse.Namespace:
 
 def print_next_steps():
     print("\nDone! Next steps:")
-    print("  1. Review and customize CLAUDE.md")
-    print("  2. Run /spec to populate spec files with Claude")
-    print("  3. Add features with /feature add")
-    print("  4. Start building with /implement F-001")
+    print("  1. Review and customize CLAUDE.md (AGENTS.md mirrors it)")
+    print("  2. Read docs/spec/GOLDEN_PRINCIPLES.md — curate the default rules")
+    print("  3. Edit docs/spec/LAYERS.md to match your project's layer model")
+    print("  4. Run /spec to populate STACK/ARCHITECTURE/CONVENTIONS/API")
+    print("  5. Add features with /feature add")
+    print("  6. Start building with /implement F-001")
     print()
 
 

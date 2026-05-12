@@ -44,13 +44,17 @@ End-to-end feature implementation using the multi-agent coordinated workflow.
 ### Phase 1: Plan (Coordinator)
 
 1. **Read context:**
+   - `docs/spec/GOLDEN_PRINCIPLES.md` — the mechanical rules every agent must respect
+   - `docs/spec/AGENT_DISPATCH.md` — the five-field dispatch contract
+   - `docs/spec/LAYERS.md` — canonical dependency direction
    - `docs/plan/FEATURES.md` — feature spec and acceptance criteria
    - `docs/plan/discovery/F-XXX-*.md` — design discovery doc (if `/feature discovery` was run; provides background, alternatives, decisions)
    - `docs/plan/DECISIONS.md` — architecture decisions to respect
    - `docs/plan/DEPENDENCIES.md` — change impact matrix
    - `docs/spec/ARCHITECTURE.md` — system design and data flow
    - `docs/spec/CONVENTIONS.md` — code patterns and standards
-   - `CLAUDE.md` — stack, testing commands, conventions, agent dispatch specification
+   - `docs/spec/SMOKE_TEST.md` — browser-test playbook (read before Phase 4)
+   - `CLAUDE.md` — stack, testing commands, navigation map
    - `docs/plan/ACTIVE.md` — what's in flight (avoid conflicts)
    - Relevant source code for affected areas
 
@@ -60,6 +64,7 @@ End-to-end feature implementation using the multi-agent coordinated workflow.
    - Define verification gates between steps
    - Identify which steps can run in parallel (backend + frontend independence)
    - Plan TDD: which tests to write before implementation
+   - For each dispatched agent, list the relevant `GP-NNN` IDs the agent must respect (e.g., "GP-002 — schema-validate the request body", "GP-007 — types on all new public functions")
 
 3. **Get user approval** on the plan before proceeding
 
@@ -157,21 +162,16 @@ If `$ARGUMENTS` is `--resume`:
 
 ## Agent Dispatch Specification
 
-Every agent dispatch MUST include these five fields. See CLAUDE.md "Agent Dispatch Specification" for the canonical version and rules.
+See **`docs/spec/AGENT_DISPATCH.md`** for the canonical five-field spec, TDD step structure, discovery-to-implementation bridge, and anti-patterns. Every dispatch in this command's plan MUST honor that spec.
 
-| Field | Purpose | Example |
-|-------|---------|---------|
-| **Files to read** | Reference context (read-only) | `core/models.py`, `core/tests/test_permissions.py` |
-| **Files to modify** | Ownership — only this agent touches these | `core/permissions.py`, `core/signals.py` |
-| **Work** | Bullet list of specific tasks | "Create `can_view_module()` with organizer bypass..." |
-| **Completion criteria** | How to verify the agent succeeded | "Permission and signal tests pass" |
-| **Scope guard** | What the agent must NOT touch | "Only `core/permissions.py` and `core/signals.py`" |
+Quick reference (five required fields): **Files to read**, **Files to modify**, **Work**, **Completion criteria**, **Scope guard**.
 
-**Rules:**
-- No file ownership overlap between concurrent agents — if two agents need the same file, run them sequentially
-- Each agent batch is followed by a test suite run before the next batch starts
-- Group agents to maximize parallelism: backend agents alongside frontend agents when independent
-- Maximum 3 concurrent agents per batch to keep context manageable
+## Verification gate per batch
+
+After each agent batch:
+1. Run full test suite (commands from CLAUDE.md's "Testing & linting" section).
+2. Run `/check-layers --diff` — any GP-006 violations block the next batch.
+3. Update the PROGRESS file checkboxes.
 
 ## Commit Convention
 
@@ -179,4 +179,5 @@ One commit per logical step:
 - `feat(F-XXX): [step description]`
 - `test(F-XXX): [test description]`
 - `fix(B-XXX): [bug fix found during implementation]`
+- `refactor(GP-NNN): [GP-driven cleanup that happened during the work]`
 - `docs: [documentation updates]`

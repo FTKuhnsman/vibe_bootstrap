@@ -47,6 +47,7 @@ Fix a bug using the structured reproduce → test → fix → verify workflow.
 3. **Read context:**
    - `docs/plan/DEPENDENCIES.md` — identify what else could break
    - `docs/spec/ARCHITECTURE.md` — understand data flow through the affected area
+   - `docs/spec/GOLDEN_PRINCIPLES.md` — many bug fixes hint at a GP rule the original code violated (e.g., probing instead of validating, GP-002). Note the relevant GP-ID for the commit message.
 
 ### Step 2: Reproduce
 
