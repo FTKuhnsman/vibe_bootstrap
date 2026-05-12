@@ -768,6 +768,7 @@ This bootstrap is organized around the principles from OpenAI's [harness enginee
 | Preset | Stack | Backend | Frontend |
 |--------|-------|---------|----------|
 | `django-react` | Django + React/Vite | pytest, ruff | vitest, eslint, prettier |
+| `expo-django` | Expo (React Native) + Django | pytest, ruff | jest/expo, eslint, prettier |
 | `nextjs` | Next.js fullstack | — | jest/vitest, eslint |
 | `fastapi-react` | FastAPI + React/Vite | pytest, ruff | vitest, eslint, prettier |
 | `express-react` | Express + React/Vite | jest, eslint | vitest, eslint, prettier |
@@ -777,6 +778,16 @@ This bootstrap is organized around the principles from OpenAI's [harness enginee
 | `go-htmx` | Go + HTMX | go test, golangci-lint | — |
 | `python-only` | Python (no frontend) | pytest, ruff | — |
 | `node-only` | Node.js/TypeScript | — | vitest, eslint |
+
+### Notes on `expo-django`
+
+This is the only preset where the "frontend" is a native mobile app (with Expo Web as a bonus browser target). A few things behave differently:
+
+- **Django dev server binds to `0.0.0.0:8000`** so a physical phone on the same LAN can reach it. For a simulator on the same machine, `localhost` works too.
+- **Metro bundler runs on port 8081** (Expo's default). `pnpm start` launches it; scan the QR with Expo Go, or press `i` / `a` for iOS/Android simulators, `w` for Expo Web.
+- **The Dockerfile does not bundle the mobile app.** Mobile builds go through EAS Build (App Store / Play Store) or Expo Updates (OTA). The generated `Dockerfile` only ships the Django backend.
+- **`/verify-ui` and `SMOKE_TEST.md` assume Chrome.** Easiest path: smoke-test on Expo Web (`pnpm exec expo start --web`). For native-only flows (camera, push notifications), document a Maestro or Detox playbook in `SMOKE_TEST.md` and skip `/verify-ui` for those features.
+- **`LAYERS.md` needs hand-curation.** The default mapping uses `frontend/src/**` patterns; for Expo, swap those for `mobile/**` and add a layer for native-only modules (camera, secure-store, notifications) if they end up large enough to warrant separation.
 
 ---
 

@@ -44,6 +44,18 @@ build/
 .turbo/
 *.tsbuildinfo
 {{/if}}
+{{#if frontend.is_native}}
+# --- Expo / React Native ---
+# Prebuild output and native projects are gitignored by default in managed
+# Expo workflows. Remove these entries if you've ejected to bare workflow
+# and want to track the native dirs.
+{{frontend.directory}}/ios/
+{{frontend.directory}}/android/
+{{frontend.directory}}/web-build/
+*.orig.*
+# EAS local credentials
+credentials.json
+{{/if}}
 {{#if deploy}}
 # --- Deployment artifacts ---
 VERSION

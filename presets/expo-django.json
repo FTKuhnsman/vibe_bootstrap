@@ -1,0 +1,40 @@
+{
+  "project": {
+    "name": "My Project",
+    "description": "A mobile-first app: Expo (React Native) client with a Django + DRF backend"
+  },
+  "backend": {
+    "language": "python",
+    "framework": "django",
+    "directory": "backend",
+    "test_command": "cd backend && pytest",
+    "lint_command": "cd backend && ruff check . && ruff format --check .",
+    "format_tool": "ruff format",
+    "format_pattern": "\\.py$",
+    "server_command": "python manage.py runserver 0.0.0.0:8000",
+    "server_port": 8000,
+    "package_manager": "pip",
+    "install_command": "pip install -r requirements.txt",
+    "cli_prefixes": ["python manage.py", "pytest", "ruff"]
+  },
+  "frontend": {
+    "language": "typescript",
+    "framework": "expo",
+    "directory": "mobile",
+    "test_command": "cd mobile && pnpm test",
+    "lint_command": "cd mobile && pnpm lint",
+    "build_command": "cd mobile && pnpm exec expo export --platform web",
+    "format_tool": "npx prettier --write",
+    "format_pattern": "\\.(ts|tsx|js|jsx|json)$",
+    "server_command": "pnpm start",
+    "server_port": 8081,
+    "package_manager": "pnpm",
+    "install_command": "pnpm install",
+    "cli_prefixes": ["pnpm", "npx", "expo", "eas"]
+  },
+  "git": {
+    "main_branch": "main",
+    "commit_convention": "conventional"
+  },
+  "platform": "auto"
+}

@@ -40,6 +40,7 @@ DOCS_DIR = SCRIPT_DIR / "docs"
 
 PRESET_CHOICES = [
     ("django-react", "Django + React (Vite)"),
+    ("expo-django", "Expo (React Native) + Django"),
     ("nextjs", "Next.js (fullstack)"),
     ("fastapi-react", "FastAPI + React"),
     ("express-react", "Express + React"),
@@ -497,6 +498,17 @@ def install_deploy_files(target: Path, config: dict, force: bool):
     if config.get("frontend") and config["frontend"].get("build_command"):
         config.setdefault("deploy", {})["has_build"] = True
 
+    # Decide whether to bundle the frontend into the backend's Docker image.
+    # Web frontends (React/Vue/Next) produce a static `dist/` that Django/Flask/etc
+    # serve directly, so we bundle. Native mobile frontends (Expo / React Native)
+    # ship through their own pipeline (EAS Build → app stores, Expo Updates for OTA),
+    # so the backend container should not try to copy a web build into itself.
+    fe = config.get("frontend") or {}
+    framework = (fe.get("framework") or "").lower()
+    is_native = framework in {"expo", "react-native"}
+    bundle_frontend = bool(fe) and not is_native
+    config.setdefault("deploy", {})["bundle_frontend"] = bundle_frontend
+
     # deploy.sh + deploy.ps1
     for name in ("deploy.sh", "deploy.ps1"):
         content = render_template_file(f"deploy/{name}.tmpl", config)
@@ -816,6 +828,12 @@ def main():
         config["project"].setdefault("description", "")
     else:
         config = interactive_wizard()
+
+    # Mark native mobile frontends (Expo / React Native) so templates can branch on it.
+    # Web frontends (React, Vue, Next, etc.) leave this falsy.
+    if config.get("frontend"):
+        fw = (config["frontend"].get("framework") or "").lower()
+        config["frontend"]["is_native"] = fw in {"expo", "react-native"}
 
     # Deploy is opt-in via flag OR preset/config field. Flag wins if set.
     # NOTE: an empty dict is falsy in Python, so do not gate on `if config.get("deploy")`.
