@@ -43,7 +43,15 @@ End-to-end feature implementation using the multi-agent coordinated workflow.
 
 ### Phase 1: Plan (Coordinator)
 
-1. **Read context:**
+1. **Check feature status (lifecycle gate):**
+   - Read the feature's status from `docs/plan/FEATURES.md`
+   - Apply the `can_implement()` gate (see `lib/validate.py`):
+     - `stub` → **REFUSE.** Print: "Feature F-XXX is a stub. Run `/feature discovery F-XXX` to promote it to backlog first."
+     - `done` → **REFUSE.** Print: "Feature F-XXX is already done."
+     - `backlog`, `in-progress`, `blocked`, or no status field → **PROCEED.**
+   - This gate is a tested invariant (see `tests/test_lifecycle_gate.py`). It cannot be weakened without a visible test change.
+
+2. **Read context:**
    - `docs/spec/GOLDEN_PRINCIPLES.md` — the mechanical rules every agent must respect
    - `docs/spec/AGENT_DISPATCH.md` — the five-field dispatch contract
    - `docs/spec/LAYERS.md` — canonical dependency direction
@@ -58,17 +66,17 @@ End-to-end feature implementation using the multi-agent coordinated workflow.
    - `docs/plan/ACTIVE.md` — what's in flight (avoid conflicts)
    - Relevant source code for affected areas
 
-2. **Enter plan mode** and design the implementation:
+3. **Enter plan mode** and design the implementation:
    - Break work into numbered steps with sub-steps
    - Identify files each step creates/modifies (file ownership — no overlap between agents)
    - Define verification gates between steps
    - Identify which steps can run in parallel (backend + frontend independence)
    - Plan TDD: which tests to write before implementation
-   - For each dispatched agent, list the relevant `GP-NNN` IDs the agent must respect (e.g., "GP-002 — schema-validate the request body", "GP-007 — types on all new public functions")
+   - For each dispatched subagent (`test-writer`, `implementer`), specify the five-field dispatch contract and list relevant `GP-NNN` IDs (e.g., "GP-002 — schema-validate the request body", "GP-013 — tool grants enforce scope")
 
-3. **Get user approval** on the plan before proceeding
+4. **Get user approval** on the plan before proceeding
 
-4. **Create progress file:** `docs/plan/PROGRESS_F-XXX.md`
+5. **Create progress file:** `docs/plan/PROGRESS_F-XXX.md`
    ```markdown
    # F-XXX: [Feature Name] — Implementation Progress
 
@@ -80,17 +88,22 @@ End-to-end feature implementation using the multi-agent coordinated workflow.
    - [ ] 2a. [sub-step]
    ```
 
-5. **Create feature branch:** `git checkout -b feature/F-XXX-short-name`
+6. **Create feature branch:** `git checkout -b feature/F-XXX-short-name`
 
-6. **Update ACTIVE.md:** Mark feature as in-progress
+7. **Update ACTIVE.md:** Mark feature as in-progress
 
-### Phase 2: TDD — Write Tests First (Agents)
+### Phase 2: TDD — Write Tests First (via `test-writer` subagent)
 
 For each step that changes application logic:
 
-1. **Dispatch test-writing agents** (backend + frontend can run in parallel):
-   - Each agent gets: files to read (reference), files to create (test files), completion criteria
-   - Tests should define the expected behavior of the new code
+1. **Dispatch the `test-writer` subagent** (backend + frontend can run in parallel):
+   - Provide the five-field dispatch contract per `docs/spec/AGENT_DISPATCH.md`:
+     - **Files to read:** spec files, discovery doc, existing source code for context
+     - **Files to modify:** the test file(s) to create
+     - **Work:** what behavior to test (happy path, error cases, edge cases)
+     - **Completion criteria:** tests exist and fail with the expected error
+     - **Scope guard:** do not create or modify any non-test file
+   - The `test-writer` agent has NO Bash access (enforced by tool grants — see GP-013)
    - Tests WILL FAIL initially — that's expected
    - Follow testing patterns from `docs/spec/CONVENTIONS.md`
 
@@ -98,12 +111,17 @@ For each step that changes application logic:
 
 3. **Update progress file** — mark test sub-steps complete
 
-### Phase 3: Implement (Agents)
+### Phase 3: Implement (via `implementer` subagent)
 
-1. **Dispatch implementation agents** in parallel batches:
-   - Each agent owns specific files (no overlap)
-   - Agent prompt includes: files to read, files to modify, patterns to follow (reference CLAUDE.md and docs/spec/CONVENTIONS.md), what NOT to do
-   - Backend and frontend agents run in parallel when independent
+1. **Dispatch the `implementer` subagent** in parallel batches:
+   - Provide the five-field dispatch contract:
+     - **Files to read:** the failing tests (primary context), spec files, discovery doc
+     - **Files to modify:** the production files to create/update (no overlap between agents)
+     - **Work:** make the failing tests pass
+     - **Completion criteria:** all tests pass, lint clean
+     - **Scope guard:** which files and layers NOT to touch
+   - The `implementer` reads failing tests first — they are the specification
+   - Backend and frontend `implementer` dispatches run in parallel when independent
 
 2. **After each batch:**
    - Run full test suite using commands from CLAUDE.md's "Testing & Linting" section

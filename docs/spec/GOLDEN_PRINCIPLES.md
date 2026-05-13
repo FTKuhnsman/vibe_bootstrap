@@ -18,6 +18,7 @@ Mechanical, opinionated rules that keep this codebase legible for agents and hum
 | `/clean-up` | Applies auto-fix hints to the current diff |
 | `/implement`, `/refactor` | Reads rules as constraints during the plan phase |
 | `/check-layers` | Enforces GP-006 specifically (layered dependencies) |
+| `/garden-docs` | Validates spec files against codebase reality |
 
 ---
 
@@ -162,6 +163,18 @@ Mechanical, opinionated rules that keep this codebase legible for agents and hum
 **How to apply:** Find the generator command (usually in `package.json` scripts, a `Makefile`, or a `scripts/` directory). Re-run it. If the output is wrong, fix the input schema or generator config — not the output.
 
 **Auto-fix hint:** Run the generator command. If the output is still wrong, modify the source schema/spec/template and re-run.
+
+---
+
+## GP-013 — Subagent tool grants are the mechanical scope guard
+
+**Rule:** The `tools:` list in a subagent's YAML frontmatter (`.claude/agents/*.md`) is the enforcement mechanism for the dispatch contract's "Scope guard" field. A read-only subagent must not have Write or Edit grants. A test-writing agent must not have Bash.
+
+**Why:** Prose scope guards rely on the agent's judgment — it can ignore or misinterpret them. Tool grants are mechanical: the runtime enforces them regardless of what the prompt says. This is the difference between "please don't write files" and "you physically cannot write files."
+
+**How to apply:** Before dispatching a subagent, verify its tool list in `.claude/agents/<name>.md` matches the intended scope. Run `python -m pytest tests/test_agent_invariants.py -v` to catch grant creep. When writing a new subagent, start with the minimal tool set and justify each addition.
+
+**Auto-fix hint:** Compare frontmatter `tools:` against the dispatch's "Files to modify." If the agent shouldn't modify files, remove Write/Edit. If it shouldn't run commands, remove Bash. Run the invariant tests to confirm.
 
 ---
 

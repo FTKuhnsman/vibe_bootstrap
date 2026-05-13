@@ -1,6 +1,22 @@
 # Feature Backlog
 
-Features organized by phase. Use `/feature add` to add new features, `/feature list` to browse.
+Features organized by phase. Use `/feature add` to add new features, `/feature stub` to create placeholders, `/feature list` to browse.
+
+## Feature Lifecycle
+
+```
+stub → backlog → in-progress → done
+                 ↕
+               blocked
+```
+
+- **`stub`** — Placeholder. Cannot be implemented until `/feature discovery` runs and promotes it to `backlog`.
+- **`backlog`** — Fully specified and ready to build. `/implement` is allowed.
+- **`in-progress`** — Currently being built.
+- **`blocked`** — Waiting on an external dependency.
+- **`done`** — Shipped and verified. Cannot be re-implemented.
+
+Features without a `status:` field are treated as `backlog` (backward compatibility). The lifecycle gate is enforced by `can_implement()` in `lib/validate.py`.
 
 ---
 
@@ -23,7 +39,7 @@ Use this format when adding features manually (or use `/feature add`):
 ```
 ### F-XXX: [Feature Name]
 - **Priority:** P0/P1/P2/P3
-- **Status:** `backlog`
+- **Status:** `stub` | `backlog` | `in-progress` | `blocked` | `done`
 - **Estimated Effort:** S/M/L/XL
 - **Phase:** [number]
 - **Description:** [what and why]

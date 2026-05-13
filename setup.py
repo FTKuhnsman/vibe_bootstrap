@@ -36,6 +36,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PRESETS_DIR = SCRIPT_DIR / "presets"
 TEMPLATES_DIR = SCRIPT_DIR / "templates"
 COMMANDS_DIR = SCRIPT_DIR / "commands"
+AGENTS_DIR = SCRIPT_DIR / "agents"
 DOCS_DIR = SCRIPT_DIR / "docs"
 
 PRESET_CHOICES = [
@@ -425,10 +426,24 @@ def copy_tree(src_dir: Path, dest_dir: Path, force: bool, prefix: str = ""):
 # ---------------------------------------------------------------------------
 
 
+def detect_existing_bootstrap(target: Path) -> bool:
+    """Heuristic: .claude/commands/ + docs/plan/FEATURES.md = already bootstrapped."""
+    return (
+        (target / ".claude" / "commands").exists()
+        and (target / "docs" / "plan" / "FEATURES.md").exists()
+    )
+
+
 def install_commands(target: Path, force: bool):
     """Copy slash commands to .claude/commands/."""
     dest = target / ".claude" / "commands"
     copy_tree(COMMANDS_DIR, dest, force, ".claude/commands/")
+
+
+def install_agents(target: Path, force: bool):
+    """Copy subagent definitions to .claude/agents/."""
+    dest = target / ".claude" / "agents"
+    copy_tree(AGENTS_DIR, dest, force, ".claude/agents/")
 
 
 def install_docs(target: Path, force: bool):
@@ -540,9 +555,18 @@ def install_deploy_files(target: Path, config: dict, force: bool):
 
 
 def install_all(target: Path, config: dict, force: bool):
-    """Full installation: commands + docs + specs + config files."""
+    """Full installation: commands + agents + docs + specs + config files."""
+    if detect_existing_bootstrap(target) and not force:
+        print(
+            "\nThis project appears to already be bootstrapped.\n"
+            "Re-running will update commands, agents, and config but "
+            "preserve your spec files.\n"
+            "Use --force to overwrite everything.\n"
+        )
+
     print("\nCreating files...")
     install_commands(target, force)
+    install_agents(target, force)
     install_docs(target, force)
     install_specs(target, force)
     install_config_files(target, config, force)
@@ -754,6 +778,11 @@ def parse_args() -> argparse.Namespace:
         help="Only install slash commands",
     )
     parser.add_argument(
+        "--agents-only",
+        action="store_true",
+        help="Only install subagent definitions",
+    )
+    parser.add_argument(
         "--docs-only",
         action="store_true",
         help="Only install planning docs",
@@ -762,6 +791,11 @@ def parse_args() -> argparse.Namespace:
         "--specs-only",
         action="store_true",
         help="Only install spec templates",
+    )
+    parser.add_argument(
+        "--from-stack",
+        metavar="KEYWORDS",
+        help='Generate a preset from freeform stack keywords (e.g. "django react", "phoenix+liveview")',
     )
     parser.add_argument(
         "--target",
@@ -805,6 +839,12 @@ def main():
         print("\nDone!")
         return
 
+    if args.agents_only:
+        print("Installing subagent definitions...")
+        install_agents(target, args.force)
+        print("\nDone!")
+        return
+
     if args.docs_only:
         print("Installing planning docs...")
         install_docs(target, args.force)
@@ -818,7 +858,20 @@ def main():
         return
 
     # Full install: need config
-    if args.config:
+    if args.from_stack:
+        from lib.stack_keywords import resolve_stack
+        config, unknown = resolve_stack(args.from_stack)
+        if config is None:
+            print(f"Error: no recognized stack keywords in '{args.from_stack}'")
+            print("  Try: django, fastapi, flask, express, rails, laravel, go, phoenix,")
+            print("       react, vue, nextjs, sveltekit, expo, python, node")
+            sys.exit(1)
+        if unknown:
+            print(f"  Note: unrecognized keywords ignored: {', '.join(unknown)}")
+        config.setdefault("project", {})
+        config["project"].setdefault("name", "My Project")
+        config["project"].setdefault("description", "")
+    elif args.config:
         config = load_config_file(args.config)
     elif args.preset:
         config = load_preset(args.preset)

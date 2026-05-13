@@ -68,6 +68,38 @@ If a session dies mid-implementation:
 - All committed work is safe.
 - Use `/implement --resume` (or `/refactor --resume`) to auto-detect and continue.
 
+## Mechanical enforcement via subagents
+
+The five-field contract above is the **coordination protocol** — what the orchestrator plans. The enforcement mechanism is the **tool grant** in each subagent's YAML frontmatter (`.claude/agents/*.md`).
+
+### How it maps
+
+| Five-field contract | Enforcement mechanism |
+|--------------------|-----------------------|
+| **Files to read** | All subagents have `Read`, `Grep`, `Glob` |
+| **Files to modify** | Only subagents with `Write`/`Edit` can modify files |
+| **Work** | Described in the subagent's system prompt |
+| **Completion criteria** | Verified by the orchestrator after dispatch |
+| **Scope guard** | **Partially enforced by denied tools.** A read-only subagent (`code-reviewer`, `layer-checker`) cannot write files regardless of what the prose says. See GP-013. |
+
+### Subagent roster
+
+| Agent | Role in TDD cycle | Key tool constraint |
+|-------|-------------------|---------------------|
+| `test-writer` | RED step — writes failing tests | NO Bash (can't run implementations) |
+| `implementer` | GREEN step — makes tests pass | Full access including Bash |
+| `code-reviewer` | Review gate after batches | NO Write/Edit (read-only) |
+| `layer-checker` | GP-006 enforcement | NO Write/Edit (read-only) |
+| `garbage-collector` | GP drift scanning / fixing | Edit only in --fix mode |
+| `doc-gardener` | Spec freshness checking | Edit only in --fix mode |
+| `discovery-interviewer` | Per-feature discovery interview | NO Bash |
+
+### Tested invariants
+
+The tool-grant constraints above are tested in `tests/test_agent_invariants.py`. Adding `Bash` to `test-writer` or `Write` to `code-reviewer` breaks a test — the only way to bypass the constraint is to modify the test, which shows in the PR diff for human review.
+
+Run `python -m pytest tests/test_agent_invariants.py -v` to verify.
+
 ## Anti-patterns to reject
 
 - **Implicit ownership.** "Update the user model" without listing the file — reject; coordinator must name `users/models.py` explicitly.

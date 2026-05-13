@@ -60,23 +60,25 @@ Fix a bug using the structured reproduce → test → fix → verify workflow.
 2. **If not browser-reproducible**, reproduce via test:
    - Write a minimal test case that triggers the bug
 
-### Step 3: Write Failing Test
+### Step 3: Write Failing Test (via `test-writer` subagent)
 
-1. **Write a test that captures the bug:**
-   - The test should FAIL with the current code
-   - The test should PASS once the bug is fixed
-   - Follow testing patterns from `docs/spec/CONVENTIONS.md`
-   - Place in the appropriate test file for the affected module
+1. **Dispatch the `test-writer` subagent** with:
+   - **Files to read:** bug details, affected source code, `docs/spec/CONVENTIONS.md`
+   - **Files to modify:** the test file for the affected module
+   - **Work:** write a test that captures the bug (FAIL with current code, PASS after fix)
+   - **Completion criteria:** test exists and fails with the expected error
+   - **Scope guard:** do not modify any non-test file
 2. **Run the test to confirm it fails** using the test commands from CLAUDE.md
 
 ### Step 4: Fix
 
 1. **For simple bugs** (1-3 files): Fix directly
-2. **For complex bugs** (4+ files or cross-module): Dispatch agent(s) with:
-   - Files to read (reference)
-   - Files to modify (ownership)
-   - The failing test as the completion criterion
-   - Scope guard (fix only the bug, don't refactor)
+2. **For complex bugs** (4+ files or cross-module): Dispatch the `implementer` subagent with:
+   - **Files to read:** the failing test, affected source, spec files
+   - **Files to modify:** the production files to fix (ownership)
+   - **Work:** make the failing test pass
+   - **Completion criteria:** the failing test passes, full suite clean
+   - **Scope guard:** fix only the bug — do not refactor surrounding code
 
 ### Step 5: Verify
 

@@ -59,20 +59,29 @@ Refactor code safely using TDD, parallel agents, and verification gates.
 
 5. **Create branch:** `git checkout -b refactor/[short-name]`
 
-### Step 2: Write Tests First (Agents)
+### Step 2: Write Tests First (via `test-writer` subagent)
 
 For each refactoring step:
 
-1. **Write tests that define the expected behavior of the NEW code:**
+1. **Dispatch the `test-writer` subagent** with the five-field contract:
+   - **Files to read:** affected source files, spec files, existing tests
+   - **Files to modify:** new test files for the refactored abstractions
+   - **Work:** write tests that define the expected behavior of the NEW code
+   - **Completion criteria:** tests exist and fail (new abstractions) or pass (behavior preservation)
+   - **Scope guard:** do not create or modify any non-test file
    - If extracting a mixin/factory: test the new abstraction directly
    - If moving code: test that the new location works
-   - Tests SHOULD FAIL initially
 
 2. **Verify existing tests still pass** — the refactoring must not break them
 
-### Step 3: Implement (Agents)
+### Step 3: Implement (via `implementer` subagent)
 
-1. **Dispatch agents in parallel batches** (backend + frontend independent)
+1. **Dispatch the `implementer` subagent** in parallel batches (backend + frontend independent):
+   - **Files to read:** failing/new tests, spec files, existing source
+   - **Files to modify:** production files being refactored
+   - **Work:** make all tests pass
+   - **Completion criteria:** all tests pass, lint clean
+   - **Scope guard:** files not in the refactoring scope
 2. **After each batch:**
    - Run full test suite using commands from CLAUDE.md — ALL existing + new tests must pass
    - Fix any regressions immediately

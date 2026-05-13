@@ -100,11 +100,25 @@ Coordinator merges the per-agent reports into a single grouped report:
 
 **Dry-run (default):** Print the report. If `--report` is set, also write to `docs/plan/GC_REPORT_<YYYY-MM-DD>.md`.
 
-**`--fix`:** For each principle with violations:
-1. Create a branch: `git checkout -b gc/<date>/GP-NNN`.
-2. Dispatch a fix agent per principle (sequential — one branch at a time). The agent reads the violations list + the GP rule's auto-fix hint, applies fixes only to files listed in the violations, and runs the test suite.
-3. If tests pass: commit with `refactor(GP-NNN): garbage-collect sweep — <count> violations`.
-4. If tests fail: leave the branch with the partial work and a `GC_FAILED_GP-NNN.md` note in `docs/plan/`. Skip to next principle.
+**`--fix`:** Before applying any fixes, enforce the coverage guard:
+
+1. **Coverage gate** (mechanical — calls `lib/validate.py:check_coverage_gate()`):
+   - Read `vibe.config.json` for `garbage_collect.min_coverage_for_fix` (default: 70) and `garbage_collect.coverage_command` (inferred from stack if absent).
+   - Run the coverage command to get the current coverage percentage.
+   - Call `check_coverage_gate(min_coverage, actual_coverage)`.
+   - If the gate returns `passed=False`: print the reason string, write the scan report to `docs/plan/GC_REPORT_<date>.md`, and **stop**. Do not apply fixes. The reason string includes instructions for the `--force` override.
+   - If `--force` is also passed: log `force-used: true` in `GC_LOG.md`, print a warning, and proceed despite low coverage.
+
+2. For each principle with violations:
+   a. Create a branch: `git checkout -b gc/<date>/GP-NNN`.
+   b. Dispatch the `garbage-collector` subagent with:
+      - **Files to read:** violations list, GP rule + auto-fix hint, `docs/spec/CONVENTIONS.md`
+      - **Files to modify:** only files listed in the violations for this GP rule
+      - **Work:** apply the auto-fix hint to each violation
+      - **Completion criteria:** all violations addressed, test suite passes
+      - **Scope guard:** only modify files in the violations list for this GP-NNN
+   c. If tests pass: commit with `refactor(GP-NNN): garbage-collect sweep — <count> violations`.
+   d. If tests fail: leave the branch with the partial work and a `GC_FAILED_GP-NNN.md` note in `docs/plan/`. Skip to next principle.
 
 **`--open-prs`:** Imply `--fix`. After each successful branch, push it and open a PR with:
 - Title: `refactor(GP-NNN): garbage-collect sweep — <count> violations`
@@ -130,6 +144,24 @@ The harness-engineering article emphasizes that garbage collection is *continuou
 **Manual cadence:** Run `/garbage-collect --report` weekly to track drift. Run `/garbage-collect --fix --principle GP-NNN` when one rule accumulates enough violations to warrant a sweep.
 
 **`/loop` integration:** Tools like `/loop` can run this on an interval (e.g., `/loop 1d /garbage-collect --report`). Background sweeps mean drift is caught while it's small.
+
+## Configuration (`vibe.config.json`)
+
+The coverage guard reads from the `garbage_collect` section of `vibe.config.json`:
+
+```json
+{
+  "garbage_collect": {
+    "min_coverage_for_fix": 70,
+    "coverage_command": "python -m pytest --cov --cov-report=term-missing"
+  }
+}
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `min_coverage_for_fix` | `70` | Minimum test coverage percentage required before `--fix` applies changes. Below this, only a report is generated. Override with `--force`. |
+| `coverage_command` | *(inferred from stack)* | Shell command that produces coverage output. If absent, inferred from `vibe.config.json` backend/frontend test commands. |
 
 ## Anti-patterns to avoid
 

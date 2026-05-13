@@ -33,12 +33,15 @@ Building software with Claude Code is powerful, but the workflow — slash comma
 **Core idea (from the article):** anything the agent can't access in-context doesn't exist for it. So you build the *harness* — a small, opinionated set of files and commands — that lets the agent reason about the full domain directly from the repository.
 
 **What you get:**
-- 18 slash commands for the full development lifecycle, including `/garbage-collect` and `/check-layers`
-- **Golden Principles**: 12 mechanical, agent-actionable rules (`GP-001`..`GP-012`) every command consults
+- 18+ slash commands for the full development lifecycle, including `/garbage-collect`, `/check-layers`, and `/garden-docs`
+- **7 native subagents** (`.claude/agents/`) with mechanically enforced tool grants — scope guards live in code, not prose (see GP-013)
+- **Golden Principles**: 13 mechanical, agent-actionable rules (`GP-001`..`GP-013 including GP-013 (subagent tool grants as mechanical scope guard)`) every command consults
 - **Layered architecture enforcement**: `docs/spec/LAYERS.md` + `/check-layers` block backward imports
-- **Continuous garbage collection**: `/garbage-collect` scans for principle drift, opens targeted refactor PRs
+- **Continuous garbage collection**: `/garbage-collect` scans for principle drift, opens targeted refactor PRs — with a coverage guard that blocks `--fix` below a configurable threshold
+- **Feature lifecycle enforcement**: `stub → backlog → in-progress → done` with a tested gate that prevents implementing undiscovered features
 - Planning system (features, bugs, decisions, dependencies, discovery)
 - Eight spec files covering stack, architecture, conventions, API, golden principles, agent dispatch, layers, and smoke testing
+- **Structural integrity tests** (`tests/`) that validate subagent tool grants, command→agent references, preset schemas, and lifecycle gates — the architecture IS the test suite
 - Cross-tool compatibility: emits both `CLAUDE.md` and `AGENTS.md` (Codex/Cursor/Copilot read the latter)
 - Auto-format hooks (lint on save) + protected-file blocks
 - Browser smoke testing via the [chrome-devtools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp)
@@ -74,6 +77,8 @@ rm -rf .git  # Discard bootstrap git history
 
 # 2. Run setup with a preset (or omit --preset for interactive mode)
 python setup.py --preset django-react
+# Or generate a preset from freeform keywords:
+# python setup.py --from-stack "django react"
 # Add --with-deploy if you want Docker/Portainer-style deploy scripts
 
 # 3. Initialize your own git history
@@ -82,7 +87,7 @@ git init && git add -A && git commit -m "Initial commit with vibe_bootstrap"
 # 4. Open Claude Code in the project, then run, in order:
 #    /spec               ← have the agent populate STACK/ARCHITECTURE/CONVENTIONS/API
 #    Then hand-curate:
-#      docs/spec/GOLDEN_PRINCIPLES.md   ← 12 default rules — keep, edit, or delete
+#      docs/spec/GOLDEN_PRINCIPLES.md   ← 13 default rules — keep, edit, or delete
 #      docs/spec/LAYERS.md              ← layer model — match your repo structure
 #      docs/spec/AGENT_DISPATCH.md      ← dispatch contract — usually fine as-is
 #      docs/spec/SMOKE_TEST.md          ← stack-specific browser-test gotchas
@@ -123,7 +128,7 @@ python setup.py --preset django-react --with-deploy
 git init && git add -A && git commit -m "chore: bootstrap from vibe_bootstrap"
 ```
 
-The bootstrap writes 8 spec files, 18 slash commands, `.claude/settings.json`, `CLAUDE.md`, `AGENTS.md`, and (with `--with-deploy`) Docker scaffolding.
+The bootstrap writes 8 spec files, 18+ slash commands, 7 subagents, `.claude/settings.json`, `CLAUDE.md`, `AGENTS.md`, and (with `--with-deploy`) Docker scaffolding.
 
 #### Step 2 — First Claude Code session: orient the agent
 
@@ -140,7 +145,7 @@ Plan on ~15 minutes of interactive Q&A. Answer with intent, not detail — the s
 
 #### Step 3 — Curate `GOLDEN_PRINCIPLES.md`
 
-The bootstrap ships 12 default rules. Open `docs/spec/GOLDEN_PRINCIPLES.md` and decide for each:
+The bootstrap ships 13 default rules (GP-001 through GP-013). Open `docs/spec/GOLDEN_PRINCIPLES.md` and decide for each:
 - **Keep as-is** — the rule is universally good (most fall here).
 - **Customize** — adjust the auto-fix hint to mention your stack (e.g., GP-002 should mention Pydantic for the backend and Zod for the frontend).
 - **Retire** — if you genuinely disagree, mark the rule `RETIRED` rather than deleting. (Keeping the ID prevents future rules from accidentally reusing the number.)
@@ -674,7 +679,7 @@ A few patterns and anti-patterns that come up regardless of which walkthrough yo
 
 - **Don't hand-edit files mid-implementation.** The agent has an in-progress mental model of what each agent owns; your edits create conflicts.
 - **Don't approve a plan without reading the dispatch contracts.** Especially the scope guards — "do not modify view code" is the load-bearing constraint that keeps agents from stomping on each other.
-- **Don't run `/garbage-collect --fix` against a codebase with low test coverage.** It will degrade behavior silently. Use `--report` and expand tests first.
+- **Don't run `/garbage-collect --fix` against a codebase with low test coverage.** The coverage guard (default threshold: 70%, configurable via `garbage_collect.min_coverage_for_fix` in `vibe.config.json`) will block `--fix` automatically. Use `--force` to override, but this is logged in `GC_LOG.md` with `force-used: true`.
 - **Don't let `BUGS.md` and `ACTIVE.md` go stale.** When the agent reads them as context and they're wrong, every downstream decision starts from a bad premise.
 - **Don't conflate `/spec` with the four hand-edited files.** `/spec` rewrites `STACK/ARCHITECTURE/CONVENTIONS/API`. It does **not** touch `GOLDEN_PRINCIPLES/AGENT_DISPATCH/LAYERS/SMOKE_TEST` — those are yours.
 
@@ -700,6 +705,7 @@ A few patterns and anti-patterns that come up regardless of which walkthrough yo
 | `/verify-ui [flow]` | Browser smoke test via chrome-devtools MCP |
 | `/clean-up` | Code quality review of current diff; applies GP auto-fix hints |
 | `/garbage-collect` | Scan for Golden Principle drift; report or open targeted refactor PRs |
+| `/garden-docs` | Scan spec files for staleness against codebase; optionally fix |
 | `/check-layers` | Enforce GP-006 — verify dependency direction matches `docs/spec/LAYERS.md` |
 
 ### Project management
@@ -722,6 +728,24 @@ A few patterns and anti-patterns that come up regardless of which walkthrough yo
 
 ---
 
+## Subagents
+
+Native Claude Code subagents (`.claude/agents/*.md`) provide mechanically enforced scope via tool grants in YAML frontmatter. The five-field dispatch contract from `AGENT_DISPATCH.md` is the coordination protocol; the tool grants are the enforcement.
+
+| Agent | Role | Key constraint | Model |
+|-------|------|----------------|-------|
+| `test-writer` | RED step: writes failing tests | **No Bash** — can't run implementations | default |
+| `implementer` | GREEN step: makes tests pass | Full access including Bash | sonnet |
+| `code-reviewer` | Review gate: GP, security, perf, a11y | **No Write/Edit** — read-only | default |
+| `layer-checker` | Enforces GP-006 one-way deps | **No Write/Edit** — read-only | default |
+| `garbage-collector` | Scans for GP drift | Edit only in --fix mode | default |
+| `doc-gardener` | Spec freshness scanning | Edit only in --fix mode | default |
+| `discovery-interviewer` | Per-feature discovery interview | **No Bash** | default |
+
+**Mechanical enforcement (GP-013):** The bold constraints above are tested invariants in `tests/test_agent_invariants.py`. Adding Bash to `test-writer` or Write to `code-reviewer` breaks a test — the only way to widen a grant is to modify the test, which shows in the PR diff for human review.
+
+---
+
 ## Spec system
 
 Spec files give the agent deep context. They live in `docs/spec/`:
@@ -732,7 +756,7 @@ Spec files give the agent deep context. They live in `docs/spec/`:
 | `ARCHITECTURE.md` | System design, data flow, directory structure, auth, state management | `/spec architecture` |
 | `CONVENTIONS.md` | Naming, error handling, validation, testing patterns, code organization | `/spec conventions` |
 | `API.md` | Endpoint patterns, auth scheme, request/response formats, errors | `/spec api` |
-| `GOLDEN_PRINCIPLES.md` | Mechanical rules (`GP-001`..`GP-012`) every command consults | hand-edited |
+| `GOLDEN_PRINCIPLES.md` | Mechanical rules (`GP-001`..`GP-013`) every command consults | hand-edited |
 | `AGENT_DISPATCH.md` | Five-field dispatch contract; TDD step structure | hand-edited |
 | `LAYERS.md` | Canonical dependency direction; enforced by `/check-layers` | hand-edited |
 | `SMOKE_TEST.md` | Browser-test playbook for `/verify-ui` | hand-edited |
@@ -857,7 +881,7 @@ allowed-tools:
 Edit `docs/spec/GOLDEN_PRINCIPLES.md`. Format:
 
 ```markdown
-## GP-013 — <one-line statement>
+## GP-NNN — <one-line statement>
 
 **Rule:** <imperative>
 
@@ -868,7 +892,21 @@ Edit `docs/spec/GOLDEN_PRINCIPLES.md`. Format:
 **Auto-fix hint:** <agent-safe remediation>
 ```
 
-Bump the highest existing GP number by one. Update the "Commands that consult this file" table if a new command checks the rule.
+Bump the highest existing GP number by one (currently GP-013). Update the "Commands that consult this file" table if a new command checks the rule.
+
+### Using `--from-stack`
+
+Generate a complete preset configuration from freeform keywords:
+
+```bash
+python setup.py --from-stack "django react"        # Backend + frontend
+python setup.py --from-stack "fastapi+vue"         # Plus-separated
+python setup.py --from-stack "phoenix"             # Backend only
+python setup.py --from-stack "nextjs"              # Fullstack framework
+python setup.py --from-stack "expo django"         # Mobile + backend
+```
+
+Keywords are matched from `lib/stack_keywords.py`. Multiple tokens are merged — `"django react"` produces a Django backend + React frontend. Unrecognized tokens are reported but don't fail the command. The output is validated against the same schema as hand-curated presets.
 
 ---
 
@@ -877,7 +915,8 @@ Bump the highest existing GP number by one. Update the "Commands that consult th
 ```
 your-project/
 ├── .claude/
-│   ├── commands/                # 18 slash commands
+│   ├── agents/                  # 7 subagents with enforced tool grants
+│   ├── commands/                # 18+ slash commands
 │   ├── settings.json            # Permissions + auto-format hooks (committed)
 │   ├── settings.local.json      # (gitignored) machine-specific perms
 │   └── launch.json              # Dev server configs
@@ -900,7 +939,7 @@ your-project/
 │       ├── ARCHITECTURE.md      # System design
 │       ├── CONVENTIONS.md       # Code patterns
 │       ├── API.md               # API contracts
-│       ├── GOLDEN_PRINCIPLES.md # GP-001..GP-012 — mechanical rules
+│       ├── GOLDEN_PRINCIPLES.md # GP-001..GP-013 — mechanical rules
 │       ├── AGENT_DISPATCH.md    # Five-field dispatch contract
 │       ├── LAYERS.md            # Canonical dependency direction
 │       └── SMOKE_TEST.md        # Browser-test playbook
@@ -914,13 +953,65 @@ your-project/
 
 ---
 
+## Migrating from v0.1 to v0.2
+
+If you bootstrapped before v0.2, re-running `setup.py` upgrades you. Here's what changed and what to do:
+
+### What's new in v0.2
+
+| Addition | What it does |
+|----------|-------------|
+| `.claude/agents/` (7 files) | Native subagents with mechanically enforced tool grants (GP-013) |
+| `lib/validate.py` | Enforcement layer — lifecycle gates, coverage guards, tool-grant validators |
+| `tests/` | Structural integrity tests — the architecture IS the test suite |
+| `/feature stub` | Bulk-create placeholder features with lifecycle enforcement |
+| `/garden-docs` | Spec freshness scanning via the `doc-gardener` subagent |
+| `/plan --phases` | Phase-grouped feature overview with completion stats |
+| `--from-stack` | Generate presets from freeform keywords ("django react", "phoenix") |
+| GP-013 | "Subagent tool grants are the mechanical scope guard" |
+| Coverage guard | `/garbage-collect --fix` blocked below configurable threshold |
+| Feature lifecycle | `stub → backlog → in-progress → done` with tested `can_implement()` gate |
+
+### How to migrate
+
+```bash
+# Re-run setup.py — it detects an existing bootstrap and preserves your spec files
+python setup.py --preset <your-preset>
+
+# Or just install the new pieces:
+python setup.py --agents-only    # Add .claude/agents/ (7 subagents)
+python setup.py --commands-only  # Update .claude/commands/ (adds garden-docs, updates feature/plan/garbage-collect)
+```
+
+### Backward compatibility
+
+| What you have | How migration handles it |
+|---------------|-------------------------|
+| Features without `status:` field | `can_implement(None)` → True. Treated as `backlog`. |
+| No `.claude/agents/` | Re-run adds it. No conflict. |
+| Old commands without subagent refs | Re-run overwrites commands (bootstrap-owned). |
+| Custom `GOLDEN_PRINCIPLES.md` | NOT overwritten without `--force`. |
+| Custom `LAYERS.md` | NOT overwritten without `--force`. |
+| `vibe.config.json` without `garbage_collect` section | Coverage guard uses defaults (threshold: 70%). |
+
+### Verifying the migration
+
+```bash
+# Run the structural integrity tests to confirm everything is wired up
+python -m pytest tests/ -v
+```
+
+All tests should pass. If any fail, the error message explains the structural issue (dangling agent reference, missing frontmatter field, etc.).
+
+---
+
 ## FAQ
 
 **Q: Can I use this with an existing project?**
 Yes. Run `python setup.py --target /path/to/existing/project`. It won't overwrite existing files without `--force`. Then run `/spec --update` to generate specs from your codebase. Curate `GOLDEN_PRINCIPLES.md` and `LAYERS.md` carefully — an existing codebase will violate some of the defaults, and you need to decide rule-by-rule whether to enforce or retire.
 
 **Q: What if my stack isn't in the presets?**
-Use `python setup.py` (interactive mode) and select "Custom" to configure manually, or copy the closest preset and edit `vibe.config.json`.
+Three options: (1) `python setup.py --from-stack "phoenix react"` — generates a preset from freeform keywords (supported: django, fastapi, flask, express, rails, laravel, go, phoenix, react, vue, nextjs, sveltekit, expo, python, node). (2) Interactive mode: `python setup.py` → select "Custom." (3) Copy the closest preset and edit `vibe.config.json`.
 
 **Q: Do I need the chrome-devtools MCP for `/verify-ui`?**
 Yes — `/verify-ui` (and the smoke-test phase of `/implement`, `/fix-bug`, `/refactor`) call tools named `mcp__chrome-devtools__*`. Install the [chrome-devtools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) in your Claude Code settings. Skipping the MCP leaves the other 15 commands fully functional — just do browser testing manually.
